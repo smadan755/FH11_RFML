@@ -1,5 +1,6 @@
 # FH11_RFML
 
+Project Repo for Faculty Honors team FH11: Spectrum Sensing and Signal Classification using Deep Neural Networks
 
 
 ## Contents
@@ -128,10 +129,6 @@ print(os.path.exists(r'c:\Users\madan\FH11_RFML\test_arr.npy'))
 
 If the file is created successfully, `npy-matlab` is working.
 
-## Where to go next
-
-- Clone `npy-matlab` (if not done) and re-run the example notebooks
-- If you want `bpsk()` to also return the generated vector to Python (instead of only saving), update `bpsk.m` to include an output argument and return `bpsk_pb`.
 
 ## License
 
