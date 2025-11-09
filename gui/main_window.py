@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from scipy import signal
 import numpy as np
 from waveform_functions import *
 import matlab.engine
@@ -29,7 +30,17 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.selection_widget)
         
         # Add PlottingWidget on the right
-        self.plotting_widget = PlottingWidget()
+        self.plotting_widget = QTabWidget()
+        
+        self.time_domain_plot = PlottingWidget()
+        
+        self.freq_domain_plot = FreqDomainPlot()
+        self.iq_domain_plot = IQDomainPlot()
+        
+        self.plotting_widget.addTab(self.time_domain_plot, "Time Domain")
+        self.plotting_widget.addTab(self.freq_domain_plot, "Frequency Domain")
+        self.plotting_widget.addTab(self.iq_domain_plot, "IQ Plot")
+        
         main_layout.addWidget(self.plotting_widget)
         
         central_widget.setLayout(main_layout)
@@ -69,7 +80,36 @@ class MainWindow(QMainWindow):
 
         t = np.linspace(0,T,len(data))
         
-        self.plotting_widget.plot_data(t,data)
+        freqs, ft = self.eng.plotspec_gui(data, 1/fs, nargout = 2)
+        freqs = np.array(freqs).flatten()
+        ft = np.array(ft).flatten()
+    
+        
+        self.time_domain_plot.plot_data(t,data)
+        self.freq_domain_plot.plot_data(freqs,np.abs(ft))
+        
+        if waveform == "QAM":
+            # Proper I/Q demodulation
+            t_demod = np.arange(len(data)) / fs
+
+            # Demodulate I (in-phase) and Q (quadrature) components
+            I = data * 2 * np.cos(2*np.pi*fc*t_demod)
+            Q = data * (-2) * np.sin(2*np.pi*fc*t_demod)
+
+            # Low-pass filter to remove high-frequency components (2*fc)
+            # Design a low-pass filter with cutoff at fc/2
+            sos = signal.butter(4, fc/2, 'low', fs=fs, output='sos')
+            I_filtered = signal.sosfilt(sos, I)
+            Q_filtered = signal.sosfilt(sos, Q)
+
+            # Downsample to symbol rate (one sample per symbol)
+            # Take samples at the middle of each symbol period for best sampling point
+            offset = int(sps/2)  # Sample at center of symbol
+            I_symbols = I_filtered[offset::int(sps)]
+            Q_symbols = Q_filtered[offset::int(sps)]
+            self.iq_domain_plot.plot_data(I_symbols, Q_symbols, m)
+        else:
+            self.iq_domain_plot.plot_data()
 
         
         
@@ -182,8 +222,51 @@ class PlottingWidget(QWidget):
         
         # Refresh canvas
         self.canvas.draw()
+
+class FreqDomainPlot(PlottingWidget):
+    def __init__(self):
+        super().__init__()
         
+    def plot_data(self, freqs= None, fft= None):
+        """Generate and display a sample plot"""
+        # Clear previous plot
+        self.figure.clear()
         
+        # Create subplot
+        ax = self.figure.add_subplot(111)
+     
+        if (freqs is not None and fft is not None):
+            ax.plot(freqs, fft, label='Waveform')
+            ax.set_xlabel('Frequency [Hz]')
+            ax.set_ylabel('Magnitude')
+            ax.set_title('Frequency Domain')
+            ax.legend()
+            ax.grid(True)
+        
+        # Refresh canvas
+        self.canvas.draw()
+
+class IQDomainPlot(PlottingWidget):
+    def __init__(self):
+        super().__init__()
+    def plot_data(self, Inphase= None, Quadrature= None, M = None):
+        """Generate and display a sample plot"""
+        # Clear previous plot
+        self.figure.clear()
+        
+        # Create subplot
+        ax = self.figure.add_subplot(111)
+     
+        if (Inphase is not None and Quadrature is not None and M is not None):
+            ax.scatter(Inphase, Quadrature, label='Waveform')
+            ax.set_xlabel('Inphase')
+            ax.set_ylabel('Quadrature')
+            ax.set_title(f"{int(M)}-QAM Constellation (Demodulated)")
+            ax.axis('equal')
+            ax.grid(True)
+        
+        # Refresh canvas
+        self.canvas.draw()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
