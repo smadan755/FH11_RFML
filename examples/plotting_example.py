@@ -13,7 +13,7 @@ eng.addpath(f"C:\\Users\\madan\\FH11_RFML\\gui\\waveform_functions", nargout=0)
 def main():
     fs = 48e3
     Tsymb = 1e-3
-    fc = 20e3
+    fc = 10e3
     M = 4.0
     Var = 1.0
 
