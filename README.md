@@ -199,3 +199,16 @@ If the file is created successfully, `npy-matlab` is working.
 ## License
 
 This README and repository are provided as-is for demo/learning purposes. Check toolbox/license constraints for MATLAB code if you plan to reuse in other projects.
+
+## Attribution
+
+**Software Receiver Design (SRD) Code**
+
+The `tools/SRD/` directory contains MATLAB code examples from the book "Software Receiver Design" by C. Richard Johnson, Jr. and William A. Sethares. These files are used for educational purposes as reference implementations for signal processing and receiver design concepts.
+
+- Book: "Software Receiver Design: Build Your Own Digital Communication System in Five Easy Steps"
+- Authors: C. Richard Johnson, Jr. and William A. Sethares
+- Original code repository: [https://github.com/various implementations]
+- Used under educational/research purposes
+
+If you use this code in your own projects, please cite the original authors and their work appropriately.
