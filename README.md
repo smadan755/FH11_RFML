@@ -6,6 +6,8 @@ Project Repo for Faculty Honors team FH11: Spectrum Sensing and Signal Classific
 ## Contents
 
 - `bpsk.m`, `pam.m`, `mqam.m` - MATLAB functions that generate modulated signals and save them to `.npy` files
+- `gui/main_window.py` - Interactive Qt GUI application for waveform generation and visualization
+- `gui/waveform_functions/` - Modified MATLAB functions that return waveforms for real-time plotting
 - `examples/interactive_test.ipynb` - interactive notebook that calls `bpsk()` via the MATLAB Engine
 - `test_wav.ipynb` - example notebook demonstrating basic MATLAB Engine usage
 - `data_bpsk/`, `data_pam/` - generated example data (NumPy .npy files)
@@ -17,6 +19,61 @@ This repository demonstrates how to:
 - Transfer data between NumPy and MATLAB
 - Use MATLAB toolboxes (e.g., signal processing) from Python
 - Save MATLAB arrays to NumPy `.npy` files from MATLAB using the `npy-matlab` helper
+- **NEW:** Generate and visualize RF waveforms in real-time using a Qt-based GUI
+
+## GUI Application
+
+The repository includes an interactive GUI application (`gui/main_window.py`) for generating and visualizing RF modulation waveforms.
+
+### Features
+
+- **Parameter Control Panel**: Configure waveform parameters including:
+  - Waveform type (PAM, QAM, FM)
+  - Sample rate (fs)
+  - Symbol period (Tsymb)
+  - Carrier frequency (fc)
+  - Modulation order (M)
+  - Variance (Var)
+  - Number of symbols (Nsymb)
+
+- **Interactive Plotting**: Real-time matplotlib visualization with:
+  - Zoom and pan controls
+  - Export to image
+  - Grid display
+  - Time-domain waveform display
+
+### Running the GUI
+
+#### Prerequisites
+
+Install required Python packages:
+
+```powershell
+pip install PySide6 matplotlib numpy
+```
+
+Make sure MATLAB Engine for Python is installed (see installation section above).
+
+#### Launch the GUI
+
+```powershell
+python gui/main_window.py
+```
+
+The GUI will:
+1. Automatically start a MATLAB engine session
+2. Load the waveform generation functions from `gui/waveform_functions/`
+3. Display a parameter input panel and interactive plot window
+
+#### Using the GUI
+
+1. Select your desired waveform type from the dropdown (PAM, QAM, FM)
+2. Adjust parameters using the input fields (default values are pre-populated)
+3. Click "Run" to generate the waveform
+4. The waveform will be plotted in the interactive matplotlib canvas
+5. Use the toolbar to zoom, pan, or save the plot
+
+**Note:** The GUI uses modified MATLAB functions from `gui/waveform_functions/` that return waveform data instead of saving to disk.
 
 ## Prerequisites
 
@@ -24,6 +81,7 @@ This repository demonstrates how to:
 - MATLAB R2025b (or matching release — see notes below)
 - Python 3.11 (your environment may vary)
 - Git (to clone helper libraries)
+- **For GUI:** PySide6, matplotlib, numpy (see GUI section for installation)
 
 ## Install MATLAB Engine for Python
 
@@ -93,6 +151,7 @@ eng.bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc, nargout=0)
 - "Too many output arguments":
   - Cause: You called a MATLAB function from Python expecting a return value but the MATLAB function is defined with no outputs.
   - Fix: Call the function with `nargout=0` from Python (e.g., `eng.bpsk(..., nargout=0)`).
+  - **Note:** There are two versions of some functions (e.g., `pam.m`): root versions save to disk (no outputs), while `gui/waveform_functions/` versions return data for plotting. Make sure the correct path is added to MATLAB when using the GUI.
 
 - "Undefined function 'writeNPY'":
   - Cause: `writeNPY()` is provided by the `npy-matlab` project, not by MATLAB core.
@@ -128,6 +187,13 @@ print(os.path.exists(r'c:\Users\madan\FH11_RFML\test_arr.npy'))
 ```
 
 If the file is created successfully, `npy-matlab` is working.
+
+## Where to go next
+
+- **Try the GUI:** Run `python gui/main_window.py` to experiment with real-time waveform generation and visualization
+- Clone `npy-matlab` (if not done) and re-run the example notebooks
+- Customize waveform parameters in the GUI or notebooks to see different modulation schemes
+- If you want `bpsk()` to also return the generated vector to Python (instead of only saving), update `bpsk.m` to include an output argument and return `bpsk_pb`
 
 
 ## License
