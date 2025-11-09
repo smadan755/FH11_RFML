@@ -208,7 +208,7 @@ The `tools/SRD/` directory contains MATLAB code examples from the book "Software
 
 - Book: "Software Receiver Design: Build Your Own Digital Communication System in Five Easy Steps"
 - Authors: C. Richard Johnson, Jr. and William A. Sethares
-- Original code repository: [https://github.com/various implementations]
+- Original code repository: [(https://github.com/gopmc/SRD)]
 - Used under educational/research purposes
 
 If you use this code in your own projects, please cite the original authors and their work appropriately.
