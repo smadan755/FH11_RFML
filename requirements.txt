@@ -1,0 +1,6 @@
+pyside6
+scipy
+matplotlib
+numpy
+matlabengine
+python-dotenv

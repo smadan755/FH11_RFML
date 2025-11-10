@@ -10,7 +10,10 @@ from waveform_functions import *
 import matlab.engine
 import numpy as np
 import matplotlib.pyplot as plt
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -18,8 +21,7 @@ class MainWindow(QMainWindow):
         
         self.eng = matlab.engine.start_matlab()
         
-        self.eng.addpath(f"C:\\Users\\madan\\FH11_RFML\\gui\\waveform_functions", nargout=0)
-
+        self.eng.addpath(os.getenv('ROOT') + "gui/waveform_functions", nargout=0)
         
         # Create central widget with horizontal layout
         central_widget = QWidget()
