@@ -1,0 +1,6 @@
+# Exclude notebooks from GitHub language statistics
+*.ipynb linguist-detectable=false
+
+# ensure MATLAB and Python are counted correctly
+*.m linguist-language=MATLAB
+*.py linguist-language=Python
