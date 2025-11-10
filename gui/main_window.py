@@ -36,10 +36,12 @@ class MainWindow(QMainWindow):
         
         self.freq_domain_plot = FreqDomainPlot()
         self.iq_domain_plot = IQDomainPlot()
+        self.spectrogram_plot = SpectrogramPlot() 
         
         self.plotting_widget.addTab(self.time_domain_plot, "Time Domain")
         self.plotting_widget.addTab(self.freq_domain_plot, "Frequency Domain")
         self.plotting_widget.addTab(self.iq_domain_plot, "IQ Plot")
+        self.plotting_widget.addTab(self.spectrogram_plot, "Spectrogram")
         
         main_layout.addWidget(self.plotting_widget)
         
@@ -71,6 +73,9 @@ class MainWindow(QMainWindow):
             data = self.eng.pam_gui(output_len, fs, tsymb, fc, m, var)
         elif waveform == "QAM":
             data = self.eng.mqam_gui(output_len, fs, tsymb, fc, m)
+        elif waveform == "FSK":
+            data = self.eng.fsk_gui(output_len, fs, tsymb, fc, m)
+
 
         
         data = np.array(data).flatten()
@@ -87,6 +92,7 @@ class MainWindow(QMainWindow):
         
         self.time_domain_plot.plot_data(t,data)
         self.freq_domain_plot.plot_data(freqs,np.abs(ft))
+        self.spectrogram_plot.plot_data(data, fs)
         
         if waveform == "QAM":
             # Proper I/Q demodulation
@@ -127,7 +133,7 @@ class SelectionWidget(QWidget):
         # Row 0: Waveform selection (spans all 4 columns)
         waveform_label = QLabel("Waveform:")
         self.waveform_drop_down = QComboBox()
-        waveforms = ["PAM", "QAM", "FM"]
+        waveforms = ["PAM", "QAM", "FSK"]
         for waveform in waveforms:
             self.waveform_drop_down.addItem(waveform)
         
@@ -267,6 +273,36 @@ class IQDomainPlot(PlottingWidget):
         
         # Refresh canvas
         self.canvas.draw()
+        
+        
+class SpectrogramPlot(PlottingWidget):
+    def __init__(self):
+        super().__init__()
+
+    def plot_data(self, x=None, fs=None, nperseg=256, noverlap=128):
+        """
+        Draw a time–frequency spectrogram.
+        - x: 1D signal
+        - fs: sampling rate [Hz]
+        - nperseg: FFT window length
+        - noverlap: samples of overlap between adjacent windows
+        """
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+
+        if x is not None and fs is not None and len(x) > 0:
+            # Use Matplotlib's Axes.specgram (Welch-like computation)
+            Pxx, freqs, bins, im = ax.specgram(
+                x, NFFT=nperseg, Fs=fs, noverlap=noverlap, scale='dB', mode='psd'
+            )
+            ax.set_xlabel("Time [s]")
+            ax.set_ylabel("Frequency [Hz]")
+            ax.set_title("Spectrogram")
+            # Optional: tighter y-limit to Nyquist
+            ax.set_ylim(0, fs/2)
+
+        self.canvas.draw()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
