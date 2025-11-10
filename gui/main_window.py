@@ -7,6 +7,7 @@ from matplotlib.figure import Figure
 from scipy import signal
 import numpy as np
 from waveform_functions import *
+from gui_elements import *
 import matlab.engine
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,7 +22,11 @@ class MainWindow(QMainWindow):
         
         self.eng = matlab.engine.start_matlab()
         
-        self.eng.addpath(os.getenv('ROOT') + "gui/waveform_functions", nargout=0)
+        # Get the directory where this script is located
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        waveform_functions_path = os.path.join(current_dir, "waveform_functions")
+        
+        self.eng.addpath(waveform_functions_path, nargout=0)
         
         # Create central widget with horizontal layout
         central_widget = QWidget()
@@ -57,7 +62,8 @@ class MainWindow(QMainWindow):
     
     def click_button(self):
         # Get values from line edits
-        waveform = self.selection_widget.waveform_drop_down.currentText()
+        # waveform = self.selection_widget.waveform_drop_down.currentText()
+        modulation = self.selection_widget.waveform_drop_down.currentText()
         fs = float(self.selection_widget.fs_edit.text())
         tsymb = float(self.selection_widget.tsymb_edit.text())
         fc = float(self.selection_widget.fc_edit.text())
@@ -65,22 +71,27 @@ class MainWindow(QMainWindow):
         var = float(self.selection_widget.var_edit.text())
         nsymb = int(self.selection_widget.nsymb_edit.text())
         
-        print(f"Running: {waveform}")
+        print(f"Running: {modulation}")
         print(f"Parameters: fs={fs}, Tsymb={tsymb}, fc={fc}, M={m}, Var={var}, Nsymb={nsymb}")
         
-        sps = fs*tsymb
-        output_len = nsymb*sps
+        # sps = fs*tsymb
+        # output_len = nsymb*sps
         
-        if waveform == "PAM":
-            data = self.eng.pam_gui(output_len, fs, tsymb, fc, m, var)
-        elif waveform == "QAM":
-            data = self.eng.mqam_gui(output_len, fs, tsymb, fc, m)
-        elif waveform == "FSK":
-            data = self.eng.fsk_gui(output_len, fs, tsymb, fc, m)
-
-
+        # if waveform == "PAM":
+        #     data = self.eng.pam_gui(output_len, fs, tsymb, fc, m, var)
+        # elif waveform == "QAM":
+        #     data = self.eng.mqam_gui(output_len, fs, tsymb, fc, m)
+        # elif waveform == "FSK":
+        #     data = self.eng.fsk_gui(output_len, fs, tsymb, fc, m)
         
-        data = np.array(data).flatten()
+        waveform = Waveform(fs = fs, Tsymb = tsymb, Nsymb= nsymb ,fc = fc, M =m, modulation = modulation, var = var, eng = self.eng)
+
+        # Generate the waveform data
+        waveform.generate_data()
+        
+        # data = np.array(data).flatten()
+        
+        data = waveform.get_data()
         
                 
         T = len(data)/fs
@@ -96,9 +107,11 @@ class MainWindow(QMainWindow):
         self.freq_domain_plot.plot_data(freqs,np.abs(ft))
         self.spectrogram_plot.plot_data(data, fs)
         
-        if waveform == "QAM":
+        if waveform.get_modulation() == "QAM":
             # Proper I/Q demodulation
             t_demod = np.arange(len(data)) / fs
+            
+            sps = waveform.get_sps()
 
             # Demodulate I (in-phase) and Q (quadrature) components
             I = data * 2 * np.cos(2*np.pi*fc*t_demod)

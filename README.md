@@ -2,6 +2,7 @@
 
 Project Repo for Faculty Honors team FH11: Spectrum Sensing and Signal Classification using Deep Neural Networks
 
+
 ## Contents
 
 - `bpsk.m`, `pam.m`, `mqam.m` - MATLAB functions that generate modulated signals and save them to `.npy` files
@@ -14,7 +15,6 @@ Project Repo for Faculty Honors team FH11: Spectrum Sensing and Signal Classific
 ## Overview
 
 This repository demonstrates how to:
-
 - Start and control a MATLAB session from Python using the MATLAB Engine for Python
 - Transfer data between NumPy and MATLAB
 - Use MATLAB toolboxes (e.g., signal processing) from Python
@@ -28,7 +28,6 @@ The repository includes an interactive GUI application (`gui/main_window.py`) fo
 ### Features
 
 - **Parameter Control Panel**: Configure waveform parameters including:
-
   - Waveform type (PAM, QAM, FM)
   - Sample rate (fs)
   - Symbol period (Tsymb)
@@ -38,7 +37,6 @@ The repository includes an interactive GUI application (`gui/main_window.py`) fo
   - Number of symbols (Nsymb)
 
 - **Multi-Domain Visualization** with tabbed interface:
-
   - **Time Domain**: View the modulated waveform over time
   - **Frequency Domain**: FFT spectrum analysis showing frequency components
   - **IQ Constellation**: For QAM signals, displays the demodulated constellation diagram
@@ -47,13 +45,12 @@ The repository includes an interactive GUI application (`gui/main_window.py`) fo
     - Symbol-rate downsampling for clean constellation display
 
 - **Interactive Plotting**: Real-time matplotlib visualization with:
-
   - Zoom and pan controls
   - Export to image
   - Grid display
   - Navigation toolbar on each plot
 
-- **Signal Processing**:
+- **Signal Processing**: 
   - Uses MATLAB engine for waveform generation
   - Python-based I/Q demodulation using scipy Butterworth filters
   - FFT analysis for frequency domain representation
@@ -77,7 +74,6 @@ python gui/main_window.py
 ```
 
 The GUI will:
-
 1. Automatically start a MATLAB engine session
 2. Load the waveform generation functions from `gui/waveform_functions/`
 3. Display a parameter input panel and interactive plot window
@@ -102,7 +98,6 @@ The GUI will:
 - Python 3.11 (your environment may vary)
 - Git (to clone helper libraries)
 - **For GUI:** PySide6, matplotlib, numpy, scipy (see GUI section for installation)
-  - you can also use `pip install -r requirements.txt` to install all the libraries listed in the requirements.txt
 
 ## Install MATLAB Engine for Python
 
@@ -164,20 +159,17 @@ eng.bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc, nargout=0)
 ```
 
 4. Example notebooks to open and run:
-
 - `examples/interactive_test.ipynb` — runs `bpsk()` and demonstrates PSD extraction
 - `test_wav.ipynb` — notebooks with MATLAB Engine demo code
 
 ## Important Gotchas / Troubleshooting
 
 - "Too many output arguments":
-
   - Cause: You called a MATLAB function from Python expecting a return value but the MATLAB function is defined with no outputs.
   - Fix: Call the function with `nargout=0` from Python (e.g., `eng.bpsk(..., nargout=0)`).
   - **Note:** There are two versions of some functions (e.g., `pam.m`): root versions save to disk (no outputs), while `gui/waveform_functions/` versions return data for plotting. Make sure the correct path is added to MATLAB when using the GUI.
 
 - "Undefined function 'writeNPY'":
-
   - Cause: `writeNPY()` is provided by the `npy-matlab` project, not by MATLAB core.
   - Fix: Clone `npy-matlab` and add it to the MATLAB path as described above.
 
@@ -218,6 +210,7 @@ If the file is created successfully, `npy-matlab` is working.
 - Clone `npy-matlab` (if not done) and re-run the example notebooks
 - Customize waveform parameters in the GUI or notebooks to see different modulation schemes
 - If you want `bpsk()` to also return the generated vector to Python (instead of only saving), update `bpsk.m` to include an output argument and return `bpsk_pb`
+
 
 ## License
 
