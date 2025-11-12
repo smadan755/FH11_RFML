@@ -3,3 +3,6 @@
 external/
 
 .env
+
+gui/waveform_functions/
+data_pam/
