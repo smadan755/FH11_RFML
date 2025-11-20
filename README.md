@@ -4,7 +4,7 @@ Project Repo for Faculty Honors team FH11: Spectrum Sensing and Signal Classific
 
 ## Contents
 
-- `bpsk.m`, `pam.m`, `mqam.m` - MATLAB functions that generate modulated signals and save them to `.npy` files
+- `bpsk.m`, `pam.m`, `mqam.m`, `bpsk_fhss.m` - MATLAB functions that generate modulated signals and save them to `.npy` files
 - `gui/main_window.py` - Interactive Qt GUI application for waveform generation and visualization
 - `gui/waveform_functions/` - Modified MATLAB functions that return waveforms for real-time plotting
 - `examples/interactive_test.ipynb` - interactive notebook that calls `bpsk()` via the MATLAB Engine
