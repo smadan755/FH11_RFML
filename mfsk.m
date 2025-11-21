@@ -1,10 +1,11 @@
-function mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list)
+function mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, noise_ratio)
     % data_samp_count      % Number of waveforms (files) to generate
     % save_path            % Path where .npy is saved
     % output_len           % Length of each saved output vector (samples)
     % fs                   % Sample Rate (Hz)
     % Tsymb                % Symbol Period (s)
     % fc_list              % Vector of M carrier frequencies [f1 f2 ... fM]
+    % noise_ratio          % ratio of noise to signal, P_noise / P_signal   (linear)
     %
     % ***** IMPORTANT *****
     % constraints (errors not handled)
@@ -19,6 +20,7 @@ function mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list)
     if nargin < 4 || isempty(fs), fs = 500; end
     if nargin < 5 || isempty(Tsymb), Tsymb = 0.1; end
     if nargin < 6 || isempty(fc_list), fc_list = [100 150]; end  % default 2-FSK
+    if nargin < 7 || isempty(noise_ratio), noise_ratio = 0;     end
 
     % create save path directory if it doesn't already exist
     if ~exist(save_path, 'dir')
@@ -46,9 +48,20 @@ function mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list)
 
         % generate MFSK passband signal
         mfsk_pb = cos(2*pi .* freq_per_sample(:) .* t(:));
+           
+        % Add noise if noise_ratio >0
+        if noise_ratio > 0
+            sig_power   = mean(mfsk_pb.^2);           % average signal power
+            noise_power = noise_ratio * sig_power;         % desired noise power
+            sigma       = sqrt(noise_power);
+            noise       = sigma * randn(size(mfsk_pb)); % AWGN
+            mfsk_pb_noisy = mfsk_pb + noise;
+        else
+            mfsk_pb_noisy = mfsk_pb;
+        end
 
         % save file
         filename = fullfile(save_path, sprintf('mfsk_M%d_%d.npy', M, n));
-        writeNPY(mfsk_pb, filename);
+        writeNPY(mfsk_pb_noisy, filename);
     end
 end

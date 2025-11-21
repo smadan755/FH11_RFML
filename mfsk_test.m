@@ -1,11 +1,11 @@
 % generate_mfsk_dataset.m
-% Usage example for mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list)
+% Usage example for mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, noise_ratio)
 
 clear; clc; close all;
 
 
 data_samp_count = 1;   % number of waveforms to generate
-save_path = fullfile(pwd, sprintf('data_mfsk_M%d', M)); % Output folder for .npy files
+
 
 % Choose parameters so constraints hold:
 M = 4;                 % M-ary FSK (number of tones)
@@ -14,6 +14,10 @@ Tsymb = 1e-3;          % s  (symbol period) -> sps = fs*Tsymb = 48 samples/symbo
 sps = fs * Tsymb;      % should be integer
 Nsym = 2048;           % symbols per file
 output_len = Nsym * sps; % total samples per file
+noise_ratio = 0.1;     % ratio of noise to signal, P_noise / P_signal   (linear)
+
+% Output folder for .npy files
+save_path = fullfile(pwd, sprintf('data_mfsk_M%d', M)); 
 
 % Choose M distinct carrier frequencies (all < fs/2 to avoid aliasing)
 fc_list = [4e3 10e3 16e3 22e3];   % Hz, length(fc_list) = M
@@ -24,7 +28,7 @@ fc_list = [4e3 10e3 16e3 22e3];   % Hz, length(fc_list) = M
 % -----------------------
 % Generate dataset
 % -----------------------
-mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list);
+mfsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, noise_ratio);
 fprintf('Generated %d MFSK files (M = %d) in: %s\n', data_samp_count, M, save_path);
 
 % -----------------------

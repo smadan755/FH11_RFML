@@ -1,4 +1,4 @@
-function fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, Thop)
+function fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, Thop, noise_ratio)
     % fhss_bpsk
     %
     % Generate real passband BPSK signals with frequency-hopping spread spectrum.
@@ -10,6 +10,7 @@ function fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, T
     % Tsymb            - symbol period (s)
     % fc_list          - vector of hop carrier frequencies (Hz), e.g. [5e3 6e3 7e3]
     % Thop             - hop duration (s)
+    % noise_ratio      - ratio of noise to signal, P_noise / P_signal   (linear)
     %
     % ***** IMPORTANT CONSTRAINTS (not enforced) *****
     % fs*Tsymb must be an integer          -> samples per symbol
@@ -19,13 +20,14 @@ function fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, T
     % max(fc_list) < fs/2 to avoid aliasing
     % ************************************************
 
-    if nargin < 1 || isempty(data_samp_count), data_samp_count = 10; end
+    if nargin < 1 || isempty(data_samp_count), data_samp_count = 10;  end
     if nargin < 2 || isempty(save_path),      save_path      = pwd;   end
     if nargin < 3 || isempty(output_len),     output_len     = 2000;  end
     if nargin < 4 || isempty(fs),             fs             = 48e3;  end
     if nargin < 5 || isempty(Tsymb),          Tsymb          = 1e-3;  end
     if nargin < 6 || isempty(fc_list),        fc_list        = [5e3 6e3 7e3 8e3]; end
     if nargin < 7 || isempty(Thop),           Thop           = 10*Tsymb;          end
+    if nargin < 8 || isempty(noise_ratio),    noise_ratio    = 0;     end
 
     % Ensure save directory exists
     if ~exist(save_path, 'dir')
@@ -81,8 +83,19 @@ function fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, T
         % upconvert
         fhss_bpsk_pb = bpsk_bb .* carrier;
 
+        % Add noise if noise_ratio >0
+        if noise_ratio > 0
+            sig_power   = mean(fhss_bpsk_pb.^2);           % average signal power
+            noise_power = noise_ratio * sig_power;         % desired noise power
+            sigma       = sqrt(noise_power);
+            noise       = sigma * randn(size(fhss_bpsk_pb)); % AWGN
+            fhss_bpsk_pb_noisy = fhss_bpsk_pb + noise;
+        else
+            fhss_bpsk_pb_noisy = fhss_bpsk_pb;
+        end
+
         % save file
         filename = fullfile(save_path, sprintf('fhss_bpsk_%d.npy', n));
-        writeNPY(fhss_bpsk_pb, filename);
+        writeNPY(fhss_bpsk_pb_noisy, filename);
     end
 end

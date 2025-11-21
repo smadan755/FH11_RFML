@@ -1,5 +1,5 @@
 % generate_fhss_bpsk_dataset.m
-% Usage example for fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, Thop)
+% Usage example for fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, Thop, noise_ratio)
 
 clear; clc; close all;
 
@@ -12,6 +12,7 @@ Tsymb  = 1e-3;           % s  (symbol period) -> sps = fs*Tsymb = 48 samples/sym
 sps    = fs * Tsymb;     % should be integer
 Nsym   = 2000;           % symbols per file (Nhops = Nsym / symbols_per_hop must be an integer)
 output_len = Nsym * sps; % total samples per file
+noise_ratio = 0.1;         % ratio of noise to signal, P_noise / P_signal   (linear)
 
 % FHSS-specific parameters
 % Choose distinct carrier frequencies (all < fs/2 to avoid aliasing)
@@ -24,7 +25,7 @@ Thop            = symbols_per_hop * Tsymb;  % hop duration (s)
 % -----------------------
 % Generate dataset
 % -----------------------
-fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, Thop);
+fhss_bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc_list, Thop, noise_ratio);
 fprintf('Generated %d FHSS-BPSK files in: %s\n', data_samp_count, save_path);
 
 % -----------------------
@@ -37,7 +38,7 @@ sample_path = fullfile(npys(1).folder, npys(1).name);
 x = readNPY(sample_path);        % real passband FHSS-BPSK (column vector)
 
 % Plot a short time snippet
-Nplot = round(3e-2 * fs);        % ~30 ms
+Nplot = round(2e-2 * fs);        % ~30 ms
 Nplot = min(Nplot, numel(x));
 t_ms  = (0:Nplot-1)/fs * 1e3;    % ms
 figure; plot(t_ms, x(1:Nplot));
