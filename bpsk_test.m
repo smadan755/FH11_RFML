@@ -45,3 +45,14 @@ figure;
 pwelch(x, hamming(4096), 2048, 4096, fs, 'onesided');
 title('Welch PSD of BPSK passband');
 
+% Spectrogram (windows match symbol windows)
+figure;
+win = hamming(sps);      % sps = 48 samples/symbol
+noverlap = 0;
+nfft = 4*sps;
+x_slice = x(1 : floor(length(x)/20)); % Use only part of the signal
+spectrogram(x_slice, win, noverlap, nfft, fs, 'yaxis');
+title('Spectrogram of BPSK passband');
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+colorbar;

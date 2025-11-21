@@ -14,12 +14,10 @@ Nsym   = 2000;           % symbols per file (Nhops = Nsym / symbols_per_hop must
 output_len = Nsym * sps; % total samples per file
 
 % FHSS-specific parameters
-% Choose a set of carrier frequencies (all < fs/2)
-fc_center = 6e3;         % Hz
-delta_f   = 5e3;         % spacing between hop channels
-fc_list   = fc_center + delta_f * (-1:1);   % e.g. [5e3, 6e3, 7e3]
+% Choose distinct carrier frequencies (all < fs/2 to avoid aliasing)
+fc_list = [6e3 12e3 18e3];
 
-% Hop every 10 symbols (slow FHSS)
+% Hop every 10 symbols
 symbols_per_hop = 10;
 Thop            = symbols_per_hop * Tsymb;  % hop duration (s)
 
@@ -39,7 +37,7 @@ sample_path = fullfile(npys(1).folder, npys(1).name);
 x = readNPY(sample_path);        % real passband FHSS-BPSK (column vector)
 
 % Plot a short time snippet
-Nplot = round(3e-3 * fs);        % ~3 ms
+Nplot = round(3e-2 * fs);        % ~30 ms
 Nplot = min(Nplot, numel(x));
 t_ms  = (0:Nplot-1)/fs * 1e3;    % ms
 figure; plot(t_ms, x(1:Nplot));
@@ -50,3 +48,16 @@ title(sprintf('FHSS BPSK passband snippet — %s', npys(1).name), 'Interpreter',
 figure;
 pwelch(x, hamming(4096), 2048, 4096, fs, 'onesided');
 title('Welch PSD of FHSS BPSK passband');
+
+
+% Spectrogram (windows match symbol windows)
+figure;
+win = hamming(sps);   % sps = 48 samples/symbol
+noverlap = 0;
+nfft = 4*sps;
+x_slice = x(1 : floor(length(x)/10)); % Use only part of the signal
+spectrogram(x_slice, win, noverlap, nfft, fs, 'yaxis');
+title('Spectrogram of FHSS BPSK passband (symbol-aligned)');
+ylabel('Frequency (Hz)');
+xlabel('Time (s)');
+colorbar;
