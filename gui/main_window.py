@@ -155,6 +155,10 @@ class SelectionWidget(QWidget):
         layout.addWidget(waveform_label, 0, 0)
         layout.addWidget(self.waveform_drop_down, 0, 1, 1, 3)  # Span 3 columns
         
+        # OFDM will pull up an alternate menu
+        
+        self.OFDM_selected = False
+        
         # Row 1: fs and Tsymb
         fs_label = QLabel("fs (Hz):")
         self.fs_edit = QLineEdit("48000")

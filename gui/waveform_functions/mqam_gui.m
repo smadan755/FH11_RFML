@@ -31,13 +31,11 @@ function mqam_pb =  mqam_gui(output_len, fs, Tsymb, fc, M)
     mqam_imp_train = qammod(data_symbols, M, 'UnitAveragePower', true);
     mqam_bb = repelem(mqam_imp_train, samp_per_symb);
 
-    % set up carrier (I/Q modulation)
+    % set up carrier
     t = (0:output_len-1) / fs;
-    carrier_I = cos(2*pi*fc*t).';
-    carrier_Q = -sin(2*pi*fc*t).';
+    carrier = cos(2*pi*fc*t).';
     
-    % upconvert to passband using quadrature modulation
-    % Real part on I carrier, imaginary part on Q carrier
-    mqam_pb = real(mqam_bb) .* carrier_I + imag(mqam_bb) .* carrier_Q;
+    % upconvert to passband
+    mqam_pb = mqam_bb .* carrier;
 
 end
