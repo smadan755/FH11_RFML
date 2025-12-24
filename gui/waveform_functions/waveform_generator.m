@@ -42,7 +42,7 @@ function sig_pb = waveform_generator(output_len, fs, Tsymb, fc, M, modulation, v
     pulse_shape = p.Results.pulse_shape;
     
     %% Common parameters
-    sps = fs * Tsymb;  % Samples per symbol
+    sps = round(fs * Tsymb);  % Samples per symbol (must be integer)
     
     %% Design pulse shaping filter
     if strcmp(pulse_shape, 'rrc')
@@ -113,7 +113,7 @@ function sig_pb = generate_fsk_signal(output_len, fs, Tsymb, fc, M)
     %   fc         - Center frequency (Hz)
     %   M          - Number of frequency tones
     
-    sps = fs * Tsymb;  % Samples per symbol
+    sps = round(fs * Tsymb);  % Samples per symbol (must be integer)
     freq_sep = 1 / Tsymb;  % Minimum orthogonal frequency separation
     
     % Calculate number of symbols
