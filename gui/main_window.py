@@ -16,6 +16,7 @@ import os
 
 load_dotenv()
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -61,9 +62,9 @@ class MainWindow(QMainWindow):
         self.selection_widget.button.clicked.connect(self.click_button)
     
     def click_button(self):
-        # Get values from line edits
-        
+        """Handle Run button click - generate and plot waveform"""
         try:
+            # Get values from line edits
             modulation = self.selection_widget.waveform_drop_down.currentText()
             fs = float(self.selection_widget.fs_edit.text())
             tsymb = float(self.selection_widget.tsymb_edit.text())
@@ -72,74 +73,72 @@ class MainWindow(QMainWindow):
             var = float(self.selection_widget.var_edit.text())
             nsymb = int(self.selection_widget.nsymb_edit.text())
             
+            # Get pulse shaping parameters
+            alpha = float(self.selection_widget.alpha_edit.text())
+            span = int(self.selection_widget.span_edit.text())
+            pulse_shape = self.selection_widget.pulse_shape_combo.currentText()
+            
             print(f"Running: {modulation}")
             print(f"Parameters: fs={fs}, Tsymb={tsymb}, fc={fc}, M={m}, Var={var}, Nsymb={nsymb}")
+            print(f"Pulse Shaping: alpha={alpha}, span={span}, pulse_shape={pulse_shape}")
             
-            # This will now validate parameters and give helpful error messages
-            waveform = Waveform(fs=fs, Tsymb=tsymb, Nsymb=nsymb, fc=fc, M=m, 
-                            modulation=modulation, var=var, eng=self.eng)
+            # Create waveform (validation happens here)
+            waveform = Waveform(
+                fs=fs, 
+                Tsymb=tsymb, 
+                Nsymb=nsymb, 
+                fc=fc, 
+                M=m, 
+                modulation=modulation, 
+                var=var, 
+                eng=self.eng,
+                alpha=alpha,
+                span=span,
+                pulse_shape=pulse_shape
+            )
             
-            waveform.generate_data()
-            data = waveform.get_data()
-            
-            waveform = Waveform(fs = fs, Tsymb = tsymb, Nsymb= nsymb ,fc = fc, M =m, modulation = modulation, var = var, eng = self.eng)
-
             # Generate the waveform data
             waveform.generate_data()
-            
-            # data = np.array(data).flatten()
-            
             data = waveform.get_data()
             
-                    
-            T = len(data)/fs
-
-            t = np.linspace(0,T,len(data))
+            # Get waveform parameters
+            sps = waveform.get_sps()
+            T = len(data) / fs
+            t = np.linspace(0, T, len(data))
             
-            freqs, ft = self.eng.plotspec_gui(data, 1/fs, nargout = 2)
+            # Compute frequency spectrum using MATLAB
+            freqs, ft = self.eng.plotspec_gui(data, 1/fs, nargout=2)
             freqs = np.array(freqs).flatten()
             ft = np.array(ft).flatten()
-        
             
-            self.time_domain_plot.plot_data(t,data)
-            self.freq_domain_plot.plot_data(freqs,np.abs(ft))
+            # Update all plots
+            self.time_domain_plot.plot_data(t, data)
+            self.freq_domain_plot.plot_data(freqs, np.abs(ft))
             self.spectrogram_plot.plot_data(data, fs, modulation=modulation)
             
-            if waveform.get_modulation() == "QAM":
-                # Proper I/Q demodulation
-                t_demod = np.arange(len(data)) / fs
-                
-                sps = waveform.get_sps()
-
-                # Demodulate I (in-phase) and Q (quadrature) components
-                I = data * 2 * np.cos(2*np.pi*fc*t_demod)
-                Q = data * (-2) * np.sin(2*np.pi*fc*t_demod)
-
-                # Low-pass filter to remove high-frequency components (2*fc)
-                # Design a low-pass filter with cutoff at fc/2
-                sos = signal.butter(4, fc/2, 'low', fs=fs, output='sos')
-                I_filtered = signal.sosfilt(sos, I)
-                Q_filtered = signal.sosfilt(sos, Q)
-
-                # Downsample to symbol rate (one sample per symbol)
-                # Take samples at the middle of each symbol period for best sampling point
-                offset = int(sps/2)  # Sample at center of symbol
-                I_symbols = I_filtered[offset::int(sps)]
-                Q_symbols = Q_filtered[offset::int(sps)]
-                self.iq_domain_plot.plot_data(I_symbols, Q_symbols, m)
-            else:
-                self.iq_domain_plot.plot_data()
+            # IQ plot - pass MATLAB engine for matched filter
+            self.iq_domain_plot.plot_data(
+                data=data,
+                fs=fs,
+                fc=fc,
+                sps=sps,
+                M=m,
+                modulation=modulation,
+                alpha=alpha,
+                span=span,
+                pulse_shape=pulse_shape,
+                nsymb=nsymb,
+                eng=self.eng
+            )
+            
         except ValueError as e:
-        # Show user-friendly error message in GUI
+            # Show user-friendly error message for validation errors
             QMessageBox.warning(self, "Invalid Parameters", str(e))
             return
         except Exception as e:
+            # Show critical error for unexpected errors
             QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
             return
-        
-        
-        
-        
 
 
 class SelectionWidget(QWidget):
@@ -152,14 +151,13 @@ class SelectionWidget(QWidget):
         # Row 0: Waveform selection (spans all 4 columns)
         waveform_label = QLabel("Waveform:")
         self.waveform_drop_down = QComboBox()
-        waveforms = ["PAM", "QAM", "FSK"]
+        # All supported modulation types from MATLAB waveform_generator
+        waveforms = ["PAM", "QAM", "PSK", "FSK", "FHSS"]
         for waveform in waveforms:
             self.waveform_drop_down.addItem(waveform)
         
         layout.addWidget(waveform_label, 0, 0)
         layout.addWidget(self.waveform_drop_down, 0, 1, 1, 3)  # Span 3 columns
-        
-        # OFDM will pull up an alternate menu
         
         self.OFDM_selected = False
         
@@ -178,7 +176,7 @@ class SelectionWidget(QWidget):
         fc_label = QLabel("fc (Hz):")
         self.fc_edit = QLineEdit("6000")
         m_label = QLabel("M:")
-        self.m_edit = QLineEdit("8")
+        self.m_edit = QLineEdit("16")
         
         layout.addWidget(fc_label, 2, 0)
         layout.addWidget(self.fc_edit, 2, 1)
@@ -196,15 +194,31 @@ class SelectionWidget(QWidget):
         layout.addWidget(nsymb_label, 3, 2)
         layout.addWidget(self.nsymb_edit, 3, 3)
         
-        # Row 4: Run button (span all 4 columns)
+        # Row 4: Pulse shaping parameters
+        alpha_label = QLabel("Alpha (RRC):")
+        self.alpha_edit = QLineEdit("0.35")
+        span_label = QLabel("Span (symbols):")
+        self.span_edit = QLineEdit("8")
+        
+        layout.addWidget(alpha_label, 4, 0)
+        layout.addWidget(self.alpha_edit, 4, 1)
+        layout.addWidget(span_label, 4, 2)
+        layout.addWidget(self.span_edit, 4, 3)
+        
+        # Row 5: Pulse shape selection
+        pulse_shape_label = QLabel("Pulse Shape:")
+        self.pulse_shape_combo = QComboBox()
+        self.pulse_shape_combo.addItems(["rrc", "rect"])
+        
+        layout.addWidget(pulse_shape_label, 5, 0)
+        layout.addWidget(self.pulse_shape_combo, 5, 1)
+        
+        # Row 6: Run button (span all 4 columns)
         self.button = QPushButton("Run")
-        layout.addWidget(self.button, 4, 0, 1, 4)  # row, col, rowspan, colspan
+        layout.addWidget(self.button, 6, 0, 1, 4)
         
-        # Set the layout on the widget
         self.setLayout(layout)
-    
-    
-        
+
 
 class PlottingWidget(QWidget):
     def __init__(self):
@@ -233,12 +247,9 @@ class PlottingWidget(QWidget):
         # Initial plot
         self.plot_data()
     
-    def plot_data(self, t= None, signal= None):
+    def plot_data(self, t=None, signal=None):
         """Generate and display a sample plot"""
-        # Clear previous plot
         self.figure.clear()
-        
-        # Create subplot
         ax = self.figure.add_subplot(111)
      
         if (t is not None and signal is not None):
@@ -249,19 +260,16 @@ class PlottingWidget(QWidget):
             ax.legend()
             ax.grid(True)
         
-        # Refresh canvas
         self.canvas.draw()
+
 
 class FreqDomainPlot(PlottingWidget):
     def __init__(self):
         super().__init__()
         
-    def plot_data(self, freqs= None, fft= None):
+    def plot_data(self, freqs=None, fft=None):
         """Generate and display a sample plot"""
-        # Clear previous plot
         self.figure.clear()
-        
-        # Create subplot
         ax = self.figure.add_subplot(111)
      
         if (freqs is not None and fft is not None):
@@ -272,42 +280,260 @@ class FreqDomainPlot(PlottingWidget):
             ax.legend()
             ax.grid(True)
         
-        # Refresh canvas
         self.canvas.draw()
+
 
 class IQDomainPlot(PlottingWidget):
     def __init__(self):
         super().__init__()
-    def plot_data(self, Inphase= None, Quadrature= None, M = None):
-        """Generate and display a sample plot"""
-        # Clear previous plot
+        self.refresh_button.hide()
+        
+    def plot_data(self, data=None, fs=None, fc=None, sps=None, M=None, 
+                  modulation=None, alpha=0.35, span=8, pulse_shape='rrc',
+                  nsymb=None, eng=None):
+        """
+        Plot IQ constellation using matched filter approach from MATLAB notebook:
+        
+        1. Downconvert passband to complex baseband
+        2. Apply matched RRC filter: rxFiltered = upfirdn(txWaveform, h, 1)
+        3. Account for total delay: span * sps  
+        4. Downsample: rxSampled = rxFiltered(totalDelay + 1 : sps : end)
+        5. Truncate: rxRecovered = rxSampled(1:numSymbols)
+        """
         self.figure.clear()
-        
-        # Create subplot
         ax = self.figure.add_subplot(111)
-     
-        if (Inphase is not None and Quadrature is not None and M is not None):
-            ax.scatter(Inphase, Quadrature, label='Waveform')
-            ax.set_xlabel('Inphase')
-            ax.set_ylabel('Quadrature')
-            ax.set_title(f"{int(M)}-QAM Constellation (Demodulated)")
-            ax.axis('equal')
-            ax.grid(True)
         
-        # Refresh canvas
+        if data is None or modulation is None:
+            ax.text(0.5, 0.5, 'No IQ data to display', 
+                   ha='center', va='center', fontsize=14, color='gray')
+            ax.set_xlim(-1, 1)
+            ax.set_ylim(-1, 1)
+            self.canvas.draw()
+            return
+        
+        if modulation == "FSK":
+            self._plot_fsk_trajectory(ax, data, fs, fc, sps, M)
+        elif modulation == "FHSS":
+            self._plot_fhss_trajectory(ax, data, fs, fc, sps, M)
+        else:
+            self._plot_constellation(ax, data, fs, fc, sps, M, modulation, 
+                                     alpha, span, pulse_shape, nsymb, eng)
+        
         self.canvas.draw()
+    
+    def _plot_constellation(self, ax, data, fs, fc, sps, M, modulation,
+                            alpha, span, pulse_shape, nsymb, eng):
+        """
+        Plot constellation using matched filter demodulation.
+        Follows exact approach from MATLAB notebook.
+        """
+        sps = int(sps)
+        M = int(M)
         
+        # Step 1: Downconvert from passband to complex baseband
+        t = np.arange(len(data)) / fs
+        complex_baseband = data * np.exp(-1j * 2 * np.pi * fc * t)
+        
+        # Step 2: Apply matched filter (RRC) which also acts as low-pass
+        if pulse_shape == 'rrc' and eng is not None:
+            # Use MATLAB to design the same RRC filter
+            h = eng.rcosdesign(float(alpha), float(span), float(sps), 'sqrt', nargout=1)
+            h = np.array(h).flatten()
+            
+            # Apply matched filter (this handles both filtering and ISI reduction)
+            rxFiltered = np.convolve(complex_baseband, h, mode='full')
+            
+            # Scale factor of 2 to recover amplitude (from mixing cos²)
+            rxFiltered = 2 * rxFiltered
+            
+            # totalDelay = span * sps (from TX filter + RX matched filter)
+            totalDelay = span * sps
+            
+            # Downsample at optimal sampling instants
+            rxSampled = rxFiltered[totalDelay::sps]
+            
+            # Truncate to number of symbols, excluding edge transients
+            if nsymb is not None:
+                # Skip first 'span' symbols (TX filter transient) 
+                # and last 'span' symbols (RX filter transient)
+                skip_symbols = span
+                start_idx = skip_symbols
+                end_idx = min(nsymb - skip_symbols, len(rxSampled) - skip_symbols)
+                
+                if end_idx > start_idx:
+                    rxRecovered = rxSampled[start_idx:end_idx]
+                else:
+                    rxRecovered = rxSampled[:nsymb]
+            else:
+                rxRecovered = rxSampled
+            
+        else:
+            # Rectangular pulse - low-pass filter then downsample
+            symbol_rate = fs / sps
+            cutoff = symbol_rate / 2 * 0.8  # Tight cutoff for rect
+            sos = signal.butter(6, cutoff, 'low', fs=fs, output='sos')
+            complex_baseband = 2 * signal.sosfilt(sos, complex_baseband)
+            
+            offset = sps // 2
+            rxRecovered = complex_baseband[offset::sps]
+        
+        # Normalize to unit average power (matches MATLAB's UnitAveragePower)
+        avg_power = np.mean(np.abs(rxRecovered)**2)
+        if avg_power > 0:
+            rxRecovered = rxRecovered / np.sqrt(avg_power)
+        
+        I_symbols = np.real(rxRecovered)
+        Q_symbols = np.imag(rxRecovered)
+        
+        # Plot constellation
+        ax.scatter(I_symbols, Q_symbols, alpha=0.6, s=20, label='Received Symbols')
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+        ax.set_title(f"{M}-{modulation} Constellation Diagram")
+        ax.axis('equal')
+        ax.grid(True, alpha=0.3)
+        ax.axhline(y=0, color='k', linewidth=0.5, alpha=0.3)
+        ax.axvline(x=0, color='k', linewidth=0.5, alpha=0.3)
+        
+        # Add ideal constellation points
+        if modulation == "QAM":
+            self._add_ideal_qam_points(ax, M)
+        elif modulation == "PSK":
+            self._add_ideal_psk_points(ax, M)
+        elif modulation == "PAM":
+            self._add_ideal_pam_points(ax, M)
+            ax.text(0.98, 0.02, 'PAM: Q ≈ 0 (amplitude modulation only)', 
+                   transform=ax.transAxes, fontsize=9, 
+                   verticalalignment='bottom', horizontalalignment='right',
+                   bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    def _plot_fsk_trajectory(self, ax, data, fs, fc, sps, M):
+        """Plot FSK frequency trajectory in IQ space"""
+        t_demod = np.arange(len(data)) / fs
+        
+        complex_baseband = data * np.exp(-1j * 2 * np.pi * fc * t_demod)
+        
+        Tsymb = sps / fs
+        freq_sep = 1 / Tsymb
+        cutoff = min(M * freq_sep, fc * 0.8, fs / 2 * 0.9)
+        sos = signal.butter(4, cutoff, 'low', fs=fs, output='sos')
+        complex_baseband = signal.sosfilt(sos, complex_baseband)
+        complex_baseband = 2 * complex_baseband
+        
+        downsample_factor = max(1, int(sps / 10))
+        I_viz = np.real(complex_baseband[::downsample_factor])
+        Q_viz = np.imag(complex_baseband[::downsample_factor])
+        
+        time_colors = np.arange(len(I_viz))
+        
+        scatter = ax.scatter(I_viz, Q_viz, c=time_colors, 
+                            cmap='viridis', alpha=0.5, s=10)
+        
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+        ax.set_title(f"{int(M)}-FSK IQ Trajectory (colored by time)")
+        ax.axis('equal')
+        ax.grid(True, alpha=0.3)
+        ax.axhline(y=0, color='k', linewidth=0.5, alpha=0.3)
+        ax.axvline(x=0, color='k', linewidth=0.5, alpha=0.3)
+        
+        self.figure.colorbar(scatter, ax=ax, label='Time')
+    
+    def _plot_fhss_trajectory(self, ax, data, fs, fc, sps, M):
+        """Plot FHSS frequency hopping trajectory in IQ space"""
+        t_demod = np.arange(len(data)) / fs
+        
+        complex_baseband = data * np.exp(-1j * 2 * np.pi * fc * t_demod)
+        
+        # FHSS has wider bandwidth due to hopping
+        channel_spacing = fs / (2 * M)
+        hop_bw = channel_spacing * (M - 1)
+        cutoff = min(hop_bw * 1.5, fs / 2 * 0.9)
+        sos = signal.butter(4, cutoff, 'low', fs=fs, output='sos')
+        complex_baseband = signal.sosfilt(sos, complex_baseband)
+        complex_baseband = 2 * complex_baseband
+        
+        # Downsample for visualization
+        downsample_factor = max(1, int(sps / 10))
+        I_viz = np.real(complex_baseband[::downsample_factor])
+        Q_viz = np.imag(complex_baseband[::downsample_factor])
+        
+        time_colors = np.arange(len(I_viz))
+        
+        scatter = ax.scatter(I_viz, Q_viz, c=time_colors, 
+                            cmap='plasma', alpha=0.5, s=10)
+        
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+        ax.set_title(f"FHSS IQ Trajectory ({int(M)} channels, colored by time)")
+        ax.axis('equal')
+        ax.grid(True, alpha=0.3)
+        ax.axhline(y=0, color='k', linewidth=0.5, alpha=0.3)
+        ax.axvline(x=0, color='k', linewidth=0.5, alpha=0.3)
+        
+        self.figure.colorbar(scatter, ax=ax, label='Time')
+    
+    def _add_ideal_qam_points(self, ax, M):
+        """Add ideal QAM constellation points"""
+        M = int(M)
+        sqrt_M = int(np.sqrt(M))
+        
+        if sqrt_M * sqrt_M != M:
+            return
+        
+        levels = np.arange(-(sqrt_M-1), sqrt_M, 2)
+        I_ideal, Q_ideal = np.meshgrid(levels, levels)
+        I_ideal = I_ideal.flatten()
+        Q_ideal = Q_ideal.flatten()
+        
+        norm_factor = np.sqrt(np.mean(I_ideal**2 + Q_ideal**2))
+        I_ideal = I_ideal / norm_factor
+        Q_ideal = Q_ideal / norm_factor
+        
+        ax.scatter(I_ideal, Q_ideal, c='red', marker='x', s=100, 
+                  linewidths=2, label='Ideal', zorder=5)
+        ax.legend()
+    
+    def _add_ideal_psk_points(self, ax, M):
+        """Add ideal PSK points on unit circle"""
+        M = int(M)
+        angles = 2 * np.pi * np.arange(M) / M
+        I_ideal = np.cos(angles)
+        Q_ideal = np.sin(angles)
+        
+        ax.scatter(I_ideal, Q_ideal, c='red', marker='x', s=100, 
+                  linewidths=2, label='Ideal', zorder=5)
+        
+        theta = np.linspace(0, 2*np.pi, 100)
+        ax.plot(np.cos(theta), np.sin(theta), 'g--', alpha=0.3, label='Unit Circle')
+        ax.legend()
+    
+    def _add_ideal_pam_points(self, ax, M):
+        """Add ideal PAM levels on I-axis"""
+        M = int(M)
+        levels = np.arange(-(M-1), M, 2).astype(float)
+        
+        norm_factor = np.sqrt(np.mean(levels**2))
+        if norm_factor > 0:
+            levels = levels / norm_factor
+        
+        ax.scatter(levels, np.zeros_like(levels), c='red', marker='x', 
+                  s=100, linewidths=2, label='Ideal PAM Levels', zorder=5)
+        
+        for level in levels:
+            ax.axvline(x=level, color='red', linewidth=0.5, 
+                      alpha=0.2, linestyle='--')
+        
+        ax.legend()
+
+
 class SpectrogramPlot(PlottingWidget):
     def __init__(self):
         super().__init__()
         
-        # Remove the default refresh button from parent class
         self.refresh_button.hide()
-        
-        # Create minimal control panel
         self._create_controls()
         
-        # Store current data and modulation type
         self.current_x = None
         self.current_fs = None
         self.current_modulation = None
@@ -317,16 +543,9 @@ class SpectrogramPlot(PlottingWidget):
         controls_widget = QWidget()
         controls_layout = QHBoxLayout()
         
-        # Just a colormap selector and update button
         cmap_label = QLabel("Color Scheme:")
         self.cmap_combo = QComboBox()
-        self.cmap_combo.addItems([
-            "viridis",
-            "plasma", 
-            "inferno",
-            "jet",
-            "hot"
-        ])
+        self.cmap_combo.addItems(["viridis", "plasma", "inferno", "jet", "hot"])
         
         self.update_button = QPushButton("Refresh")
         self.update_button.clicked.connect(self._update_plot)
@@ -337,19 +556,9 @@ class SpectrogramPlot(PlottingWidget):
         controls_layout.addWidget(self.update_button)
         
         controls_widget.setLayout(controls_layout)
-        
-        # Insert controls at the top
         self.layout().insertWidget(0, controls_widget)
     
     def plot_data(self, x=None, fs=None, modulation=None):
-        """
-        Plot spectrogram with automatic settings based on modulation type
-        
-        Args:
-            x: Signal data
-            fs: Sampling frequency
-            modulation: Modulation type ("PAM", "QAM", "FSK", etc.)
-        """
         if x is not None and fs is not None:
             self.current_x = x
             self.current_fs = fs
@@ -357,58 +566,29 @@ class SpectrogramPlot(PlottingWidget):
             self._update_plot()
     
     def _get_preset(self):
-        """Get optimal spectrogram parameters based on modulation type"""
+        default = {"nperseg": 1024, "overlap": 0.75, "window": "hann", 
+                   "vmin_pct": 5, "vmax_pct": 95}
         
-        # Default preset
-        default = {
-            "nperseg": 1024,
-            "overlap": 0.75,
-            "window": "hann",
-            "vmin_pct": 5,
-            "vmax_pct": 95
-        }
-        
-        # Modulation-specific presets
         presets = {
-            "PAM": {
-                "nperseg": 512,        # Lower resolution - PAM is amplitude-based
-                "overlap": 0.70,       # Less overlap needed
-                "window": "hann",
-                "vmin_pct": 10,        # PAM has cleaner spectrum
-                "vmax_pct": 95
-            },
-            "QAM": {
-                "nperseg": 1024,       # Medium resolution for complex modulation
-                "overlap": 0.75,       # Good time-frequency balance
-                "window": "hann",
-                "vmin_pct": 5,         # QAM benefits from wider dynamic range
-                "vmax_pct": 95
-            },
-            "FSK": {
-                "nperseg": 2048,       # High frequency resolution to see tones
-                "overlap": 0.85,       # High overlap to track frequency transitions
-                "window": "blackman",  # Better frequency resolution
-                "vmin_pct": 3,         # FSK has distinct frequency peaks
-                "vmax_pct": 97
-            },
-            "OFDM": {
-                "nperseg": 2048,       # High resolution for many subcarriers
-                "overlap": 0.80,       
-                "window": "hann",
-                "vmin_pct": 5,
-                "vmax_pct": 90
-            }
+            "PAM": {"nperseg": 512, "overlap": 0.70, "window": "hann", 
+                    "vmin_pct": 10, "vmax_pct": 95},
+            "QAM": {"nperseg": 1024, "overlap": 0.75, "window": "hann", 
+                    "vmin_pct": 5, "vmax_pct": 95},
+            "PSK": {"nperseg": 1024, "overlap": 0.75, "window": "hann", 
+                    "vmin_pct": 5, "vmax_pct": 95},
+            "ASK": {"nperseg": 512, "overlap": 0.70, "window": "hann", 
+                    "vmin_pct": 10, "vmax_pct": 95},
+            "FSK": {"nperseg": 2048, "overlap": 0.85, "window": "blackman", 
+                    "vmin_pct": 3, "vmax_pct": 97},
+            "OFDM": {"nperseg": 2048, "overlap": 0.80, "window": "hann", 
+                     "vmin_pct": 5, "vmax_pct": 90}
         }
         
-        # Return preset for current modulation or default
         return presets.get(self.current_modulation, default)
     
     def _update_plot(self):
-        """Update plot with automatic settings"""
         if self.current_x is None or self.current_fs is None:
             return
-        
-        from scipy import signal
         
         self.figure.clear()
         ax = self.figure.add_subplot(111)
@@ -416,67 +596,45 @@ class SpectrogramPlot(PlottingWidget):
         x = self.current_x
         fs = self.current_fs
         
-        # Handle complex signals
         if np.iscomplexobj(x):
             x = np.real(x)
         
-        # Get optimal preset for this modulation type
         preset = self._get_preset()
         
         nperseg = preset["nperseg"]
-        overlap = preset["overlap"]
-        window = preset["window"]
-        noverlap = int(nperseg * overlap)
+        noverlap = int(nperseg * preset["overlap"])
         
-        # Calculate spectrogram
         f, t, Sxx = signal.spectrogram(
-            x,
-            fs=fs,
-            window=window,
-            nperseg=nperseg,
-            noverlap=noverlap,
-            scaling='density',
-            mode='psd'
+            x, fs=fs, window=preset["window"],
+            nperseg=nperseg, noverlap=noverlap,
+            scaling='density', mode='psd'
         )
         
-        # Convert to dB
         Sxx_dB = 10 * np.log10(Sxx + 1e-10)
         
-        # Use preset dynamic range
         vmin = np.percentile(Sxx_dB, preset["vmin_pct"])
         vmax = np.percentile(Sxx_dB, preset["vmax_pct"])
         
-        # Get colormap
-        cmap = self.cmap_combo.currentText()
+        im = ax.pcolormesh(t, f, Sxx_dB, shading='gouraud',
+                          cmap=self.cmap_combo.currentText(),
+                          vmin=vmin, vmax=vmax)
         
-        # Plot with smooth shading
-        im = ax.pcolormesh(
-            t, f, Sxx_dB,
-            shading='gouraud',
-            cmap=cmap,
-            vmin=vmin,
-            vmax=vmax
-        )
+        self.figure.colorbar(im, ax=ax, label='Power/Frequency (dB/Hz)')
         
-        # Add colorbar
-        cbar = self.figure.colorbar(im, ax=ax, label='Power/Frequency (dB/Hz)')
-        
-        # Labels and formatting
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Frequency [Hz]")
         
-        # Add modulation type to title if known
         if self.current_modulation:
-            title = f"{self.current_modulation} Spectrogram"
+            ax.set_title(f"{self.current_modulation} Spectrogram")
         else:
-            title = "Spectrogram"
-        ax.set_title(title)
+            ax.set_title("Spectrogram")
         
         ax.set_ylim(0, fs/2)
         ax.grid(True, alpha=0.3, linestyle='--')
         
         self.figure.tight_layout()
         self.canvas.draw()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

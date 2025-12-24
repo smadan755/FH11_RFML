@@ -9,7 +9,7 @@ import glob as gb
 
 @dataclass
 class WaveformConfig:
-    """Configuration for waveform generation with built-in validation"""
+    """Configuration for waveform generation with pulse shaping support"""
     modulation: str
     fs: float
     Tsymb: float
@@ -19,11 +19,26 @@ class WaveformConfig:
     var: Optional[float] = None
     freq_sep: Optional[float] = None
     
+    # Pulse shaping parameters
+    alpha: float = 0.35        # RRC roll-off factor (0 to 1)
+    span: int = 8              # Filter span in symbols
+    pulse_shape: str = 'rrc'   # 'rrc' or 'rect'
+    
     def __post_init__(self):
         """Validate parameters based on MATLAB constraints"""
         # Convert M to int if it's a float like 16.0
         if isinstance(self.M, float) and self.M.is_integer():
             self.M = int(self.M)
+        
+        # Validate pulse shaping parameters
+        if self.alpha < 0 or self.alpha > 1:
+            raise ValueError(f"alpha must be between 0 and 1, got {self.alpha}")
+        
+        if self.pulse_shape not in ['rrc', 'rect']:
+            raise ValueError(f"pulse_shape must be 'rrc' or 'rect', got {self.pulse_shape}")
+        
+        if self.span < 1:
+            raise ValueError(f"span must be >= 1, got {self.span}")
         
         self._validate()
     
@@ -37,9 +52,8 @@ class WaveformConfig:
         if self.fc >= self.fs / 2:
             raise ValueError(f"fc ({self.fc}) must be < fs/2 ({self.fs/2}) to avoid aliasing")
         
-        output_len = self.output_len
-        if output_len % self.sps != 0:
-            raise ValueError(f"output_len must be divisible by sps")
+        # Note: With pulse shaping, output_len doesn't need to be exactly divisible by sps
+        # The MATLAB function handles filter delays internally
         
         # Modulation-specific validations
         if self.modulation == "FSK":
@@ -48,55 +62,45 @@ class WaveformConfig:
             self._validate_qam()
         elif self.modulation == "PAM":
             self._validate_pam()
+        elif self.modulation == "PSK":
+            self._validate_psk()
+        elif self.modulation == "FHSS":
+            self._validate_fhss()
         else:
             raise ValueError(f"Unknown modulation type: {self.modulation}")
     
     def _validate_fsk(self):
-        """FSK: M must be power of 2, fs*Tsymb/log2(M) must be integer"""
+        """FSK: M must be power of 2"""
         if not self._is_power_of_2(self.M):
             raise ValueError(f"FSK requires M to be a power of 2, got {self.M}")
-        
-        bits_per_symbol = int(np.log2(self.M))
-        if self.sps % bits_per_symbol != 0:
-            raise ValueError(
-                f"FSK requires fs*Tsymb/log2(M) to be integer: "
-                f"{self.sps}/{bits_per_symbol} = {self.sps/bits_per_symbol}"
-            )
     
     def _validate_qam(self):
-        """
-        QAM: M must be a power of 2 (for bit mapping)
-        Square QAM: M = 4, 16, 64, 256, ... (sqrt(M) integer)
-        Cross QAM: M = 32, 128, 512, ... (sqrt(M) not integer)
-        """
-        # Must be power of 2
+        """QAM: M must be a power of 2 >= 4"""
         if not self._is_power_of_2(self.M):
             raise ValueError(
                 f"QAM: M must be a power of 2, got {self.M}. "
                 f"Valid values: 4, 16, 32, 64, 128, 256, ..."
             )
         
-        # Must be at least 4
         if self.M < 4:
             raise ValueError(f"QAM: M must be >= 4, got {self.M}")
-        
-        # Check samples per symbol divisibility
-        sps = int(self.fs * self.Tsymb)
-        bits_per_symbol = int(np.log2(self.M))
-        
-        if sps % bits_per_symbol != 0:
-            raise ValueError(
-                f"QAM requires fs*Tsymb/log2(M) to be integer: "
-                f"{sps}/{bits_per_symbol} = {sps/bits_per_symbol}"
-            )
-        
+    
     def _validate_pam(self):
-        """PAM: M must be even integer >= 2, var must be specified"""
-        if self.M < 2 or self.M % 2 != 0:
-            raise ValueError(f"PAM requires M to be even integer >= 2, got {self.M}")
+        """PAM: M must be >= 2"""
+        if self.M < 2:
+            raise ValueError(f"PAM requires M >= 2, got {self.M}")
         
-        if self.var is None:
-            raise ValueError("PAM requires 'var' parameter to be specified")
+        # var is optional - MATLAB will handle normalization
+    
+    def _validate_psk(self):
+        """PSK: M must be power of 2"""
+        if not self._is_power_of_2(self.M):
+            raise ValueError(f"PSK requires M to be a power of 2, got {self.M}")
+    
+    def _validate_fhss(self):
+        """FHSS: M is number of hopping channels, must be >= 2"""
+        if self.M < 2:
+            raise ValueError(f"FHSS requires M >= 2 hopping channels, got {self.M}")
     
     @staticmethod
     def _is_power_of_2(n):
@@ -123,7 +127,10 @@ class WaveformConfig:
             "M": self.M,
             "Nsymb": self.Nsymb,
             "sps": self.sps,
-            "output_len": self.output_len
+            "output_len": self.output_len,
+            "alpha": self.alpha,
+            "span": self.span,
+            "pulse_shape": self.pulse_shape
         }
         
         if self.var is not None:
@@ -144,7 +151,10 @@ class WaveformConfig:
             M=config_dict['M'],
             Nsymb=config_dict['Nsymb'],
             var=config_dict.get('var'),
-            freq_sep=config_dict.get('freq_sep')
+            freq_sep=config_dict.get('freq_sep'),
+            alpha=config_dict.get('alpha', 0.35),
+            span=config_dict.get('span', 8),
+            pulse_shape=config_dict.get('pulse_shape', 'rrc')
         )
 
 
@@ -157,75 +167,46 @@ class MATLABGenerator:
         self.engine = matlab_engine
     
     def generate(self, config: WaveformConfig):
-        """Generate waveform data based on configuration"""
-        if config.modulation == "PAM":
-            return self._generate_pam(config)
-        elif config.modulation == "QAM":
-            return self._generate_qam(config)
-        elif config.modulation == "FSK":
-            return self._generate_fsk(config)
-        else:
-            raise ValueError(f"Unknown modulation: {config.modulation}")
-    
-    def _generate_pam(self, config):
-        """Call MATLAB pam_gui function"""
-        result = self.engine.pam_gui(
+        """
+        Generate waveform using unified MATLAB function
+        
+        All modulations now use one function!
+        """
+        # Call unified MATLAB function with name-value pairs
+        result = self.engine.waveform_generator(
             float(config.output_len),
             float(config.fs),
             float(config.Tsymb),
             float(config.fc),
             float(config.M),
-            float(config.var),
+            config.modulation,
+            'alpha', float(config.alpha),
+            'span', float(config.span),
+            'pulse_shape', config.pulse_shape,
             nargout=1
         )
-        return np.array(result).flatten()
-    
-    def _generate_qam(self, config):
-        """Call MATLAB mqam_gui function"""
-        result = self.engine.mqam_gui(
-            float(config.output_len),
-            float(config.fs),
-            float(config.Tsymb),
-            float(config.fc),
-            float(config.M),
-            nargout=1
-        )
-        return np.array(result).flatten()
-    
-    def _generate_fsk(self, config):
-        """Call MATLAB fsk_gui function"""
-        if config.freq_sep is None:
-            result = self.engine.fsk_gui(
-                float(config.output_len),
-                float(config.fs),
-                float(config.Tsymb),
-                float(config.fc),
-                float(config.M),
-                nargout=1
-            )
-        else:
-            result = self.engine.fsk_gui(
-                float(config.output_len),
-                float(config.fs),
-                float(config.Tsymb),
-                float(config.fc),
-                float(config.M),
-                float(config.freq_sep),
-                nargout=1
-            )
+        
         return np.array(result).flatten()
 
 
 class Waveform:
-    """Main waveform class"""
+    """Main waveform class - maintains backwards compatibility"""
     
     def __init__(self, fs=None, Tsymb=None, Nsymb=None, fc=None, M=None, 
-                 modulation=None, var=None, freq_sep=None, eng=None):
+                 modulation=None, var=None, freq_sep=None, eng=None,
+                 alpha=0.35, span=8, pulse_shape='rrc'):
         """
+        Initialize waveform
         
         Usage:
+            # With RRC pulse shaping (default)
             waveform = Waveform(fs=48e3, Tsymb=1e-3, Nsymb=2048, fc=20e3, 
-                               M=16, modulation="PAM", var=1.0, eng=eng)
+                               M=16, modulation="QAM", eng=eng)
+            
+            # With rectangular pulses (legacy mode)
+            waveform = Waveform(fs=48e3, Tsymb=1e-3, Nsymb=2048, fc=20e3, 
+                               M=16, modulation="QAM", eng=eng, 
+                               pulse_shape='rect')
         """
         # Create config (this validates parameters)
         self.config = WaveformConfig(
@@ -236,7 +217,10 @@ class Waveform:
             M=M,
             Nsymb=Nsymb,
             var=var,
-            freq_sep=freq_sep
+            freq_sep=freq_sep,
+            alpha=alpha,
+            span=span,
+            pulse_shape=pulse_shape
         )
         
         # Store MATLAB generator
@@ -278,6 +262,15 @@ class Waveform:
     def get_sps(self):
         return self.config.sps
     
+    def get_alpha(self):
+        return self.config.alpha
+    
+    def get_span(self):
+        return self.config.span
+    
+    def get_pulse_shape(self):
+        return self.config.pulse_shape
+    
     # Also add property access (more Pythonic, but optional to use)
     @property
     def data(self):
@@ -318,6 +311,18 @@ class Waveform:
     def sps(self):
         return self.config.sps
     
+    @property
+    def alpha(self):
+        return self.config.alpha
+    
+    @property
+    def span(self):
+        return self.config.span
+    
+    @property
+    def pulse_shape(self):
+        return self.config.pulse_shape
+    
     # File I/O methods
     def to_json(self, rootpath='', datapath='gui/waveform_data'):
         """Save waveform configuration and data to JSON/NPY files"""
@@ -354,7 +359,7 @@ class Waveform:
     def _generate_config_name(self):
         """Generate a filename-safe config name"""
         config_name = (f"{self.modulation}-M{self.M}-fs{int(self.fs)}-"
-                      f"fc{int(self.fc)}-Tsymb{self.Tsymb}")
+                      f"fc{int(self.fc)}-Tsymb{self.Tsymb}-{self.pulse_shape}")
         return config_name.replace('.', '_')
     
     @classmethod
@@ -365,7 +370,7 @@ class Waveform:
         
         Usage:
             waveform = Waveform.from_json(
-                config_name="PAM-M16-fs48000-fc20000-Tsymb0_001",
+                config_name="QAM-M16-fs48000-fc20000-Tsymb0_001-rrc",
                 eng=eng,
                 rootpath=root,
                 data_index=0  # Load first data file
@@ -393,6 +398,9 @@ class Waveform:
             modulation=config.modulation,
             var=config.var,
             freq_sep=config.freq_sep,
+            alpha=config.alpha,
+            span=config.span,
+            pulse_shape=config.pulse_shape,
             eng=eng
         )
         
