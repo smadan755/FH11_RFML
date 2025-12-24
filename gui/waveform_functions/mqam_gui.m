@@ -1,4 +1,4 @@
-function mqam_pb =  mqam_gui(output_len, fs, Tsymb, fc, M)
+function mqam_pb = mqam_gui(output_len, fs, Tsymb, fc, M)
     % data_samp_count      % Number of data samples to generate
     % save_path            % Path where .npy is saved
     % output_len           % Length of each saved output vector
@@ -14,28 +14,30 @@ function mqam_pb =  mqam_gui(output_len, fs, Tsymb, fc, M)
     % fs*Tsymb/log2(M) must be an integer
     % output_len/(fs*Tsymb) must be an integer
     % *********************
-
-
     
     samp_per_symb = fs*Tsymb;
     bit_per_symb = log2(M);
     samp_per_bit = samp_per_symb / bit_per_symb;
-
+    
     % create random bit sequence
     bit_seq = randi([0 1], output_len/samp_per_bit, 1);
-
+    
     % Reshape bits into symbols
     data_symbols = bi2de(reshape(bit_seq, bit_per_symb, output_len/samp_per_symb).', 'left-msb');
-
-    % mQAM modulation (baseband)
+    
+    % mQAM modulation (baseband) - complex valued
     mqam_imp_train = qammod(data_symbols, M, 'UnitAveragePower', true);
     mqam_bb = repelem(mqam_imp_train, samp_per_symb);
-
-    % set up carrier
-    t = (0:output_len-1) / fs;
-    carrier = cos(2*pi*fc*t).';
     
-    % upconvert to passband
-    mqam_pb = mqam_bb .* carrier;
-
+    % Separate I and Q components
+    I = real(mqam_bb);  % In-phase component
+    Q = imag(mqam_bb);  % Quadrature component
+    
+    % Set up orthogonal carriers
+    t = (0:output_len-1) / fs;
+    carrier_I = cos(2*pi*fc*t).';      % In-phase carrier
+    carrier_Q = -sin(2*pi*fc*t).';     % Quadrature carrier (90° shifted)
+    
+    % Upconvert to passband (now REAL valued)
+    mqam_pb = I .* carrier_I + Q .* carrier_Q;
 end

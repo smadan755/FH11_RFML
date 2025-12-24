@@ -1,4 +1,4 @@
-function bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc)
+function bpsk_gui(data_samp_count, save_path, output_len, fs, Tsymb, fc)
     % data_samp_count      % Number of data samples to generate
     % save_path            % Path where .npy is saved
     % output_len           % Length of each saved output vector

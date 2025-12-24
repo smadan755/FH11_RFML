@@ -62,76 +62,80 @@ class MainWindow(QMainWindow):
     
     def click_button(self):
         # Get values from line edits
-        # waveform = self.selection_widget.waveform_drop_down.currentText()
-        modulation = self.selection_widget.waveform_drop_down.currentText()
-        fs = float(self.selection_widget.fs_edit.text())
-        tsymb = float(self.selection_widget.tsymb_edit.text())
-        fc = float(self.selection_widget.fc_edit.text())
-        m = float(self.selection_widget.m_edit.text())
-        var = float(self.selection_widget.var_edit.text())
-        nsymb = int(self.selection_widget.nsymb_edit.text())
         
-        print(f"Running: {modulation}")
-        print(f"Parameters: fs={fs}, Tsymb={tsymb}, fc={fc}, M={m}, Var={var}, Nsymb={nsymb}")
-        
-        # sps = fs*tsymb
-        # output_len = nsymb*sps
-        
-        # if waveform == "PAM":
-        #     data = self.eng.pam_gui(output_len, fs, tsymb, fc, m, var)
-        # elif waveform == "QAM":
-        #     data = self.eng.mqam_gui(output_len, fs, tsymb, fc, m)
-        # elif waveform == "FSK":
-        #     data = self.eng.fsk_gui(output_len, fs, tsymb, fc, m)
-        
-        waveform = Waveform(fs = fs, Tsymb = tsymb, Nsymb= nsymb ,fc = fc, M =m, modulation = modulation, var = var, eng = self.eng)
-
-        # Generate the waveform data
-        waveform.generate_data()
-        
-        # data = np.array(data).flatten()
-        
-        data = waveform.get_data()
-        
-                
-        T = len(data)/fs
-
-        t = np.linspace(0,T,len(data))
-        
-        freqs, ft = self.eng.plotspec_gui(data, 1/fs, nargout = 2)
-        freqs = np.array(freqs).flatten()
-        ft = np.array(ft).flatten()
-    
-        
-        self.time_domain_plot.plot_data(t,data)
-        self.freq_domain_plot.plot_data(freqs,np.abs(ft))
-        self.spectrogram_plot.plot_data(data, fs)
-        
-        if waveform.get_modulation() == "QAM":
-            # Proper I/Q demodulation
-            t_demod = np.arange(len(data)) / fs
+        try:
+            modulation = self.selection_widget.waveform_drop_down.currentText()
+            fs = float(self.selection_widget.fs_edit.text())
+            tsymb = float(self.selection_widget.tsymb_edit.text())
+            fc = float(self.selection_widget.fc_edit.text())
+            m = float(self.selection_widget.m_edit.text())
+            var = float(self.selection_widget.var_edit.text())
+            nsymb = int(self.selection_widget.nsymb_edit.text())
             
-            sps = waveform.get_sps()
+            print(f"Running: {modulation}")
+            print(f"Parameters: fs={fs}, Tsymb={tsymb}, fc={fc}, M={m}, Var={var}, Nsymb={nsymb}")
+            
+            # This will now validate parameters and give helpful error messages
+            waveform = Waveform(fs=fs, Tsymb=tsymb, Nsymb=nsymb, fc=fc, M=m, 
+                            modulation=modulation, var=var, eng=self.eng)
+            
+            waveform.generate_data()
+            data = waveform.get_data()
+            
+            waveform = Waveform(fs = fs, Tsymb = tsymb, Nsymb= nsymb ,fc = fc, M =m, modulation = modulation, var = var, eng = self.eng)
 
-            # Demodulate I (in-phase) and Q (quadrature) components
-            I = data * 2 * np.cos(2*np.pi*fc*t_demod)
-            Q = data * (-2) * np.sin(2*np.pi*fc*t_demod)
+            # Generate the waveform data
+            waveform.generate_data()
+            
+            # data = np.array(data).flatten()
+            
+            data = waveform.get_data()
+            
+                    
+            T = len(data)/fs
 
-            # Low-pass filter to remove high-frequency components (2*fc)
-            # Design a low-pass filter with cutoff at fc/2
-            sos = signal.butter(4, fc/2, 'low', fs=fs, output='sos')
-            I_filtered = signal.sosfilt(sos, I)
-            Q_filtered = signal.sosfilt(sos, Q)
+            t = np.linspace(0,T,len(data))
+            
+            freqs, ft = self.eng.plotspec_gui(data, 1/fs, nargout = 2)
+            freqs = np.array(freqs).flatten()
+            ft = np.array(ft).flatten()
+        
+            
+            self.time_domain_plot.plot_data(t,data)
+            self.freq_domain_plot.plot_data(freqs,np.abs(ft))
+            self.spectrogram_plot.plot_data(data, fs, modulation=modulation)
+            
+            if waveform.get_modulation() == "QAM":
+                # Proper I/Q demodulation
+                t_demod = np.arange(len(data)) / fs
+                
+                sps = waveform.get_sps()
 
-            # Downsample to symbol rate (one sample per symbol)
-            # Take samples at the middle of each symbol period for best sampling point
-            offset = int(sps/2)  # Sample at center of symbol
-            I_symbols = I_filtered[offset::int(sps)]
-            Q_symbols = Q_filtered[offset::int(sps)]
-            self.iq_domain_plot.plot_data(I_symbols, Q_symbols, m)
-        else:
-            self.iq_domain_plot.plot_data()
+                # Demodulate I (in-phase) and Q (quadrature) components
+                I = data * 2 * np.cos(2*np.pi*fc*t_demod)
+                Q = data * (-2) * np.sin(2*np.pi*fc*t_demod)
 
+                # Low-pass filter to remove high-frequency components (2*fc)
+                # Design a low-pass filter with cutoff at fc/2
+                sos = signal.butter(4, fc/2, 'low', fs=fs, output='sos')
+                I_filtered = signal.sosfilt(sos, I)
+                Q_filtered = signal.sosfilt(sos, Q)
+
+                # Downsample to symbol rate (one sample per symbol)
+                # Take samples at the middle of each symbol period for best sampling point
+                offset = int(sps/2)  # Sample at center of symbol
+                I_symbols = I_filtered[offset::int(sps)]
+                Q_symbols = Q_filtered[offset::int(sps)]
+                self.iq_domain_plot.plot_data(I_symbols, Q_symbols, m)
+            else:
+                self.iq_domain_plot.plot_data()
+        except ValueError as e:
+        # Show user-friendly error message in GUI
+            QMessageBox.warning(self, "Invalid Parameters", str(e))
+            return
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+            return
         
         
         
@@ -293,35 +297,186 @@ class IQDomainPlot(PlottingWidget):
         # Refresh canvas
         self.canvas.draw()
         
-        
 class SpectrogramPlot(PlottingWidget):
     def __init__(self):
         super().__init__()
-
-    def plot_data(self, x=None, fs=None, nperseg=256, noverlap=128):
+        
+        # Remove the default refresh button from parent class
+        self.refresh_button.hide()
+        
+        # Create minimal control panel
+        self._create_controls()
+        
+        # Store current data and modulation type
+        self.current_x = None
+        self.current_fs = None
+        self.current_modulation = None
+    
+    def _create_controls(self):
+        """Create minimal control panel"""
+        controls_widget = QWidget()
+        controls_layout = QHBoxLayout()
+        
+        # Just a colormap selector and update button
+        cmap_label = QLabel("Color Scheme:")
+        self.cmap_combo = QComboBox()
+        self.cmap_combo.addItems([
+            "viridis",
+            "plasma", 
+            "inferno",
+            "jet",
+            "hot"
+        ])
+        
+        self.update_button = QPushButton("Refresh")
+        self.update_button.clicked.connect(self._update_plot)
+        
+        controls_layout.addWidget(cmap_label)
+        controls_layout.addWidget(self.cmap_combo)
+        controls_layout.addStretch()
+        controls_layout.addWidget(self.update_button)
+        
+        controls_widget.setLayout(controls_layout)
+        
+        # Insert controls at the top
+        self.layout().insertWidget(0, controls_widget)
+    
+    def plot_data(self, x=None, fs=None, modulation=None):
         """
-        Draw a time–frequency spectrogram.
-        - x: 1D signal
-        - fs: sampling rate [Hz]
-        - nperseg: FFT window length
-        - noverlap: samples of overlap between adjacent windows
+        Plot spectrogram with automatic settings based on modulation type
+        
+        Args:
+            x: Signal data
+            fs: Sampling frequency
+            modulation: Modulation type ("PAM", "QAM", "FSK", etc.)
         """
+        if x is not None and fs is not None:
+            self.current_x = x
+            self.current_fs = fs
+            self.current_modulation = modulation
+            self._update_plot()
+    
+    def _get_preset(self):
+        """Get optimal spectrogram parameters based on modulation type"""
+        
+        # Default preset
+        default = {
+            "nperseg": 1024,
+            "overlap": 0.75,
+            "window": "hann",
+            "vmin_pct": 5,
+            "vmax_pct": 95
+        }
+        
+        # Modulation-specific presets
+        presets = {
+            "PAM": {
+                "nperseg": 512,        # Lower resolution - PAM is amplitude-based
+                "overlap": 0.70,       # Less overlap needed
+                "window": "hann",
+                "vmin_pct": 10,        # PAM has cleaner spectrum
+                "vmax_pct": 95
+            },
+            "QAM": {
+                "nperseg": 1024,       # Medium resolution for complex modulation
+                "overlap": 0.75,       # Good time-frequency balance
+                "window": "hann",
+                "vmin_pct": 5,         # QAM benefits from wider dynamic range
+                "vmax_pct": 95
+            },
+            "FSK": {
+                "nperseg": 2048,       # High frequency resolution to see tones
+                "overlap": 0.85,       # High overlap to track frequency transitions
+                "window": "blackman",  # Better frequency resolution
+                "vmin_pct": 3,         # FSK has distinct frequency peaks
+                "vmax_pct": 97
+            },
+            "OFDM": {
+                "nperseg": 2048,       # High resolution for many subcarriers
+                "overlap": 0.80,       
+                "window": "hann",
+                "vmin_pct": 5,
+                "vmax_pct": 90
+            }
+        }
+        
+        # Return preset for current modulation or default
+        return presets.get(self.current_modulation, default)
+    
+    def _update_plot(self):
+        """Update plot with automatic settings"""
+        if self.current_x is None or self.current_fs is None:
+            return
+        
+        from scipy import signal
+        
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-
-        if x is not None and fs is not None and len(x) > 0:
-            # Use Matplotlib's Axes.specgram (Welch-like computation)
-            Pxx, freqs, bins, im = ax.specgram(
-                x, NFFT=nperseg, Fs=fs, noverlap=noverlap, scale='dB', mode='psd'
-            )
-            ax.set_xlabel("Time [s]")
-            ax.set_ylabel("Frequency [Hz]")
-            ax.set_title("Spectrogram")
-            # Optional: tighter y-limit to Nyquist
-            ax.set_ylim(0, fs/2)
-
+        
+        x = self.current_x
+        fs = self.current_fs
+        
+        # Handle complex signals
+        if np.iscomplexobj(x):
+            x = np.real(x)
+        
+        # Get optimal preset for this modulation type
+        preset = self._get_preset()
+        
+        nperseg = preset["nperseg"]
+        overlap = preset["overlap"]
+        window = preset["window"]
+        noverlap = int(nperseg * overlap)
+        
+        # Calculate spectrogram
+        f, t, Sxx = signal.spectrogram(
+            x,
+            fs=fs,
+            window=window,
+            nperseg=nperseg,
+            noverlap=noverlap,
+            scaling='density',
+            mode='psd'
+        )
+        
+        # Convert to dB
+        Sxx_dB = 10 * np.log10(Sxx + 1e-10)
+        
+        # Use preset dynamic range
+        vmin = np.percentile(Sxx_dB, preset["vmin_pct"])
+        vmax = np.percentile(Sxx_dB, preset["vmax_pct"])
+        
+        # Get colormap
+        cmap = self.cmap_combo.currentText()
+        
+        # Plot with smooth shading
+        im = ax.pcolormesh(
+            t, f, Sxx_dB,
+            shading='gouraud',
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax
+        )
+        
+        # Add colorbar
+        cbar = self.figure.colorbar(im, ax=ax, label='Power/Frequency (dB/Hz)')
+        
+        # Labels and formatting
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Frequency [Hz]")
+        
+        # Add modulation type to title if known
+        if self.current_modulation:
+            title = f"{self.current_modulation} Spectrogram"
+        else:
+            title = "Spectrogram"
+        ax.set_title(title)
+        
+        ax.set_ylim(0, fs/2)
+        ax.grid(True, alpha=0.3, linestyle='--')
+        
+        self.figure.tight_layout()
         self.canvas.draw()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
