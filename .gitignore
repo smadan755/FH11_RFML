@@ -6,3 +6,6 @@ external/
 
 gui/waveform_functions/
 data_pam/
+gui/__pycache__/
+sionna/sionna.ipynb
+.DS_Store
