@@ -9,3 +9,10 @@ data_pam/
 gui/__pycache__/
 sionna/sionna.ipynb
 .DS_Store
+
+# ML model files
+*.pth
+*.pt
+
+# Claude Code files
+.claude/

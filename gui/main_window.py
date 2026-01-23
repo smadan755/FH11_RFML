@@ -17,7 +17,7 @@ import os
 load_dotenv()
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         
@@ -29,9 +29,8 @@ class MainWindow(QMainWindow):
         
         self.eng.addpath(waveform_functions_path, nargout=0)
         
-        # Create central widget with horizontal layout
-        central_widget = QWidget()
-        main_layout = QVBoxLayout()
+        # Create main layout directly on this widget
+        main_layout = QVBoxLayout(self)
         
         # Add SelectionWidget on the left
         self.selection_widget = SelectionWidget()
@@ -52,9 +51,6 @@ class MainWindow(QMainWindow):
         self.plotting_widget.addTab(self.spectrogram_plot, "Spectrogram")
         
         main_layout.addWidget(self.plotting_widget)
-        
-        central_widget.setLayout(main_layout)
-        self.setCentralWidget(central_widget)
         
         self.setWindowTitle("RFML Waveform Plotter")
         self.resize(1200, 600)
