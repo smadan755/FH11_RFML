@@ -9,10 +9,12 @@ from .augmentation import (
     AugmentationBlock,
     AugmentationPipeline,
     AWGNAugmentation,
+    ScalarAmplitudeAndPhaseShift, 
 )
 
 __all__ = [
     "AugmentationBlock",
     "AugmentationPipeline",
     "AWGNAugmentation",
+    "ScalarAmplitudeAndPhaseShift",
 ]
