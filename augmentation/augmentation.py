@@ -4,6 +4,7 @@ RF Signal Augmentation Pipeline for Machine Learning
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
+from scipy.signal import hilbert
 import numpy as np
 
 
@@ -67,15 +68,12 @@ class AWGNAugmentation(AugmentationBlock):
     def __init__(
         self,
         snr_db: float = 20.0,
-        snr_range: Optional[Tuple[float, float]] = None,
         seed: Optional[int] = None
     ):
         """
             snr_db: Fixed SNR in dB (used if snr_range is None)
-            snr_range: Optional (min, max) SNR range for random selection
         """
         self.snr_db = snr_db
-        self.snr_range = snr_range
         self.rng = np.random.default_rng(seed)
 
     def apply(self, signal: np.ndarray, _fs: float, **_kwargs) -> np.ndarray:
@@ -90,10 +88,7 @@ class AWGNAugmentation(AugmentationBlock):
             Signal with added noise at specified SNR
         """
         # Determine SNR to use
-        if self.snr_range is not None:
-            snr_db = self.rng.uniform(self.snr_range[0], self.snr_range[1])
-        else:
-            snr_db = self.snr_db
+        snr_db = self.snr_db
         
         sig_power = np.mean(np.abs(signal) ** 2)
 
@@ -113,7 +108,40 @@ class AWGNAugmentation(AugmentationBlock):
         return signal + noise
 
     def __repr__(self) -> str:
-        if self.snr_range:
-            return f"AWGNAugmentation(snr_range={self.snr_range})"
         return f"AWGNAugmentation(snr_db={self.snr_db})"
 
+class ScalarAmplitudeAndPhaseShift(AugmentationBlock):
+    '''
+    This block allows you to modulate the amplitude and/or the phase of a signal by
+    multiplying the signal by a complex scalar
+
+    amplitude: scalar to amplify or attenuate magnitude of signal
+    phi: radians to delay signal by
+    '''
+
+
+    def __init__(
+        self,
+        amplitude: float = 1.0,
+        phi: float = 0.0,
+    ):
+        self.amplitude = amplitude
+        self.phi = phi
+
+    def apply(self, signal: np.ndarray, _fs: float, **_kwargs) -> np.ndarray:
+        phi = self.phi
+
+        # build the complex channel scalar  h = |a| * e^(jφ)
+        h = self.amplitude * np.exp(1j * phi)
+
+        # take hilbert transform to get x_a = x + jH{x}
+        x = hilbert(signal)
+        y_a = h * x
+
+        # recover real signal
+        y = np.real(y_a)
+
+        return y
+
+    def __repr__(self) -> str:
+        return f"ScalarAmplitudeAndPhaseShift(amplitude={self.amplitude:.4f}, phi={self.phi:.4f})"
