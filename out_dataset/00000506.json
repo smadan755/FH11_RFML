@@ -1,0 +1,43 @@
+{
+  "sample_id": 506,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "DSSS_OQPSK",
+      "chips_per_symbol": 32,
+      "sps_chip": 2,
+      "chip_rate": 5000000.0,
+      "sym_rate": 156250.0,
+      "use_half_sine": true
+    },
+    {
+      "label": "CSS_LORA",
+      "sf": 12,
+      "bw": 250000.0,
+      "Ts": 0.016384,
+      "preamble_len": 10,
+      "M": 4096,
+      "symbols": []
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 1115399.5064293267,
+      "gain": 0.6736469873958734
+    },
+    {
+      "f_off_hz": -2176994.9893944957,
+      "gain": 0.8716569234921732
+    }
+  ],
+  "channel": {
+    "snr_db": -2.197250094701305,
+    "cfo_hz": -42476.8083208992,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "DSSS_OQPSK",
+    "CSS_LORA"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "sample_id": 1774,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "OFDM",
+      "nfft": 64,
+      "ncp": 8,
+      "nused": 48,
+      "mod": "16QAM"
+    },
+    {
+      "label": "GFSK",
+      "rs": 500000.0,
+      "sps": 20,
+      "dev_hz": 175690.44736782188,
+      "bt": 0.5,
+      "span_symbols": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 1680949.3727542097,
+      "gain": 0.9396155610486879
+    },
+    {
+      "f_off_hz": -3759928.562544249,
+      "gain": 0.6702698735511424
+    }
+  ],
+  "channel": {
+    "snr_db": 16.114754428750402,
+    "cfo_hz": -21011.966687132288,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "OFDM",
+    "GFSK"
+  ]
+}

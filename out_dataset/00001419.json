@@ -1,0 +1,39 @@
+{
+  "sample_id": 1419,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "DSSS_OQPSK",
+      "chips_per_symbol": 16,
+      "sps_chip": 4,
+      "chip_rate": 2500000.0,
+      "sym_rate": 156250.0,
+      "use_half_sine": true
+    },
+    {
+      "label": "QAM",
+      "M": 64,
+      "sps": 8
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 1130155.8652221449,
+      "gain": 0.6844080799740424
+    },
+    {
+      "f_off_hz": 3885023.414328593,
+      "gain": 0.7265204086628241
+    }
+  ],
+  "channel": {
+    "snr_db": -8.196825137476015,
+    "cfo_hz": 5080.413510060767,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "DSSS_OQPSK",
+    "QAM"
+  ]
+}

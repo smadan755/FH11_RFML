@@ -1,0 +1,30 @@
+{
+  "sample_id": 1493,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "CSS_LORA",
+      "sf": 9,
+      "bw": 500000.0,
+      "Ts": 0.001024,
+      "preamble_len": 8,
+      "M": 512,
+      "symbols": []
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.8051916975143881
+    }
+  ],
+  "channel": {
+    "snr_db": -2.5504178884402364,
+    "cfo_hz": -23102.434339538115,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "CSS_LORA"
+  ]
+}

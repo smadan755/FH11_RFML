@@ -1,0 +1,36 @@
+{
+  "sample_id": 1780,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "PSK",
+      "subtype": "BPSK",
+      "sps": 4
+    },
+    {
+      "label": "QAM",
+      "M": 16,
+      "sps": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 1329668.9626330081,
+      "gain": 0.8208786835982843
+    },
+    {
+      "f_off_hz": -2067416.718369449,
+      "gain": 0.8316725576520219
+    }
+  ],
+  "channel": {
+    "snr_db": -9.04599346124197,
+    "cfo_hz": -23330.467121892052,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "PSK",
+    "QAM"
+  ]
+}

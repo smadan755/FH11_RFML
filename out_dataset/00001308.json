@@ -1,0 +1,26 @@
+{
+  "sample_id": 1308,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "PSK",
+      "subtype": "QPSK",
+      "sps": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.6237150167811157
+    }
+  ],
+  "channel": {
+    "snr_db": 19.790415225280213,
+    "cfo_hz": -40681.51825041002,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "PSK"
+  ]
+}

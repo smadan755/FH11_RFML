@@ -1,0 +1,26 @@
+{
+  "sample_id": 1663,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "QAM",
+      "M": 64,
+      "sps": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.9462528755166892
+    }
+  ],
+  "channel": {
+    "snr_db": -9.18351045276546,
+    "cfo_hz": 8642.390466958248,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "QAM"
+  ]
+}

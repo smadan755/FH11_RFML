@@ -1,0 +1,38 @@
+{
+  "sample_id": 1926,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "OFDM",
+      "nfft": 128,
+      "ncp": 32,
+      "nused": 72,
+      "mod": "QPSK"
+    },
+    {
+      "label": "QAM",
+      "M": 64,
+      "sps": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": -2337847.541601855,
+      "gain": 0.817101904533605
+    },
+    {
+      "f_off_hz": 3021213.137407435,
+      "gain": 0.7121617042201249
+    }
+  ],
+  "channel": {
+    "snr_db": 10.079154681797892,
+    "cfo_hz": 40609.81287159253,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "OFDM",
+    "QAM"
+  ]
+}

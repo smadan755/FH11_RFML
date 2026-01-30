@@ -1,0 +1,39 @@
+{
+  "sample_id": 1672,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "PSK",
+      "subtype": "BPSK",
+      "sps": 8
+    },
+    {
+      "label": "DSSS_OQPSK",
+      "chips_per_symbol": 16,
+      "sps_chip": 2,
+      "chip_rate": 5000000.0,
+      "sym_rate": 312500.0,
+      "use_half_sine": true
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 1674649.975277708,
+      "gain": 0.7500272897220666
+    },
+    {
+      "f_off_hz": -3700043.746717969,
+      "gain": 0.8131317110576514
+    }
+  ],
+  "channel": {
+    "snr_db": 3.02368962144617,
+    "cfo_hz": -43474.81283510808,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "PSK",
+    "DSSS_OQPSK"
+  ]
+}

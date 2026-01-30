@@ -1,0 +1,29 @@
+{
+  "sample_id": 34,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "GFSK",
+      "rs": 500000.0,
+      "sps": 20,
+      "dev_hz": 211490.3349230018,
+      "bt": 0.3,
+      "span_symbols": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.803225678702516
+    }
+  ],
+  "channel": {
+    "snr_db": 16.052934632516887,
+    "cfo_hz": -18399.50142397592,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "GFSK"
+  ]
+}

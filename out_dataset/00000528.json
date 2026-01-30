@@ -1,0 +1,40 @@
+{
+  "sample_id": 528,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "CSS_LORA",
+      "sf": 11,
+      "bw": 500000.0,
+      "Ts": 0.004096,
+      "preamble_len": 10,
+      "M": 2048,
+      "symbols": []
+    },
+    {
+      "label": "QAM",
+      "M": 16,
+      "sps": 8
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": -1438791.9173578653,
+      "gain": 0.815457050148098
+    },
+    {
+      "f_off_hz": 2066929.2394164559,
+      "gain": 0.9121628848801361
+    }
+  ],
+  "channel": {
+    "snr_db": 2.0367348143177892,
+    "cfo_hz": -42206.2978748726,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "CSS_LORA",
+    "QAM"
+  ]
+}

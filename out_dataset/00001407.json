@@ -1,0 +1,42 @@
+{
+  "sample_id": 1407,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "GFSK",
+      "rs": 500000.0,
+      "sps": 20,
+      "dev_hz": 113581.3976481375,
+      "bt": 0.5,
+      "span_symbols": 4
+    },
+    {
+      "label": "DSSS_OQPSK",
+      "chips_per_symbol": 32,
+      "sps_chip": 4,
+      "chip_rate": 2500000.0,
+      "sym_rate": 78125.0,
+      "use_half_sine": true
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 3055040.046198244,
+      "gain": 0.9154589776378789
+    },
+    {
+      "f_off_hz": -2559418.1099129673,
+      "gain": 0.6305702665748626
+    }
+  ],
+  "channel": {
+    "snr_db": 19.094197130023257,
+    "cfo_hz": 19140.386610683214,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "GFSK",
+    "DSSS_OQPSK"
+  ]
+}

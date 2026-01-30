@@ -1,0 +1,29 @@
+{
+  "sample_id": 1975,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "DSSS_OQPSK",
+      "chips_per_symbol": 32,
+      "sps_chip": 4,
+      "chip_rate": 2500000.0,
+      "sym_rate": 78125.0,
+      "use_half_sine": true
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.8650195081020724
+    }
+  ],
+  "channel": {
+    "snr_db": 0.6452514865888794,
+    "cfo_hz": -14827.828714717725,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "DSSS_OQPSK"
+  ]
+}

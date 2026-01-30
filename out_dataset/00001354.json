@@ -1,0 +1,43 @@
+{
+  "sample_id": 1354,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "GFSK",
+      "rs": 1000000.0,
+      "sps": 10,
+      "dev_hz": 317919.9068492695,
+      "bt": 0.5,
+      "span_symbols": 4
+    },
+    {
+      "label": "CSS_LORA",
+      "sf": 10,
+      "bw": 125000.0,
+      "Ts": 0.008192,
+      "preamble_len": 8,
+      "M": 1024,
+      "symbols": []
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 486895.85876798537,
+      "gain": 0.9754756925417581
+    },
+    {
+      "f_off_hz": 3828715.1725347517,
+      "gain": 0.9253540044279409
+    }
+  ],
+  "channel": {
+    "snr_db": 13.278402406656227,
+    "cfo_hz": 20163.16380977456,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "GFSK",
+    "CSS_LORA"
+  ]
+}

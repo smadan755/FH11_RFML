@@ -1,0 +1,28 @@
+{
+  "sample_id": 847,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "OFDM",
+      "nfft": 128,
+      "ncp": 16,
+      "nused": 72,
+      "mod": "QPSK"
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.8221319746254341
+    }
+  ],
+  "channel": {
+    "snr_db": -7.160335467598603,
+    "cfo_hz": 28130.63041821518,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "OFDM"
+  ]
+}

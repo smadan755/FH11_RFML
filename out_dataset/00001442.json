@@ -1,0 +1,38 @@
+{
+  "sample_id": 1442,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "PSK",
+      "subtype": "BPSK",
+      "sps": 4
+    },
+    {
+      "label": "OFDM",
+      "nfft": 128,
+      "ncp": 16,
+      "nused": 96,
+      "mod": "16QAM"
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 370946.4966216292,
+      "gain": 0.7584232149890302
+    },
+    {
+      "f_off_hz": 0.0,
+      "gain": 0.8720913614509848
+    }
+  ],
+  "channel": {
+    "snr_db": -1.410163446389113,
+    "cfo_hz": -6794.713271643683,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "PSK",
+    "OFDM"
+  ]
+}

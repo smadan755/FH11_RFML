@@ -1,0 +1,40 @@
+{
+  "sample_id": 1712,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "PSK",
+      "subtype": "BPSK",
+      "sps": 8
+    },
+    {
+      "label": "CSS_LORA",
+      "sf": 12,
+      "bw": 500000.0,
+      "Ts": 0.008192,
+      "preamble_len": 10,
+      "M": 4096,
+      "symbols": []
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 1636255.669079408,
+      "gain": 0.8591592163598065
+    },
+    {
+      "f_off_hz": 117575.43045334099,
+      "gain": 0.7554332811922507
+    }
+  ],
+  "channel": {
+    "snr_db": 5.208501695884294,
+    "cfo_hz": 13336.650849004327,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "PSK",
+    "CSS_LORA"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "sample_id": 1137,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "DSSS_OQPSK",
+      "chips_per_symbol": 8,
+      "sps_chip": 4,
+      "chip_rate": 2500000.0,
+      "sym_rate": 312500.0,
+      "use_half_sine": true
+    },
+    {
+      "label": "OFDM",
+      "nfft": 128,
+      "ncp": 32,
+      "nused": 96,
+      "mod": "QPSK"
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": 2985005.797107988,
+      "gain": 0.6777397035773449
+    },
+    {
+      "f_off_hz": -3217498.6897406643,
+      "gain": 0.7002996631462945
+    }
+  ],
+  "channel": {
+    "snr_db": 3.8820446210262247,
+    "cfo_hz": -46016.73247071258,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "DSSS_OQPSK",
+    "OFDM"
+  ]
+}

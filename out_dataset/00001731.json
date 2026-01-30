@@ -1,0 +1,39 @@
+{
+  "sample_id": 1731,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "PSK",
+      "subtype": "BPSK",
+      "sps": 4
+    },
+    {
+      "label": "GFSK",
+      "rs": 2000000.0,
+      "sps": 5,
+      "dev_hz": 626755.0883306675,
+      "bt": 0.7,
+      "span_symbols": 4
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": -957060.3781552212,
+      "gain": 0.7209799477171683
+    },
+    {
+      "f_off_hz": 3785251.691695815,
+      "gain": 0.8624843590700552
+    }
+  ],
+  "channel": {
+    "snr_db": 7.2673782201135495,
+    "cfo_hz": 23143.600073646216,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "PSK",
+    "GFSK"
+  ]
+}

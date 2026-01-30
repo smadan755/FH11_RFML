@@ -1,0 +1,42 @@
+{
+  "sample_id": 1536,
+  "fs": 10000000.0,
+  "n": 4096,
+  "signals": [
+    {
+      "label": "CSS_LORA",
+      "sf": 9,
+      "bw": 500000.0,
+      "Ts": 0.001024,
+      "preamble_len": 8,
+      "M": 512,
+      "symbols": []
+    },
+    {
+      "label": "OFDM",
+      "nfft": 64,
+      "ncp": 16,
+      "nused": 48,
+      "mod": "QPSK"
+    }
+  ],
+  "mix": [
+    {
+      "f_off_hz": -2297388.4710799893,
+      "gain": 0.8096830449002975
+    },
+    {
+      "f_off_hz": 3321001.4739658004,
+      "gain": 0.8629489233067216
+    }
+  ],
+  "channel": {
+    "snr_db": 7.731748662107812,
+    "cfo_hz": -18081.042445534724,
+    "multipath_len": null
+  },
+  "label_multilabel": [
+    "CSS_LORA",
+    "OFDM"
+  ]
+}
