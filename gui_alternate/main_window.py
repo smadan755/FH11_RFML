@@ -8,6 +8,7 @@ from tabs.waveform_tab import WaveformSelectionTab
 from tabs.channel_tab import ChannelNoiseTab
 from tabs.ml_training_tab import MLTrainingTab
 from tabs.inference_tab import InferenceResultsTab
+from tabs.evaluate_model_tab import EvaluateModelTab
 from styles.stylesheet import get_stylesheet
 
 import matlab.engine
@@ -60,8 +61,12 @@ class SignalDashboard(QMainWindow):
         self.inference_tab = InferenceResultsTab()
         self.content_stack.addWidget(self.inference_tab)
 
-        # Wire training → inference: auto-load trained model in inference tab
+        self.evaluate_tab = EvaluateModelTab(self.eng)
+        self.content_stack.addWidget(self.evaluate_tab)
+
+        # Wire training → inference & evaluate: auto-load trained model
         self.ml_training_tab.trained_model_ready.connect(self.inference_tab.receive_trained_model)
+        self.ml_training_tab.trained_model_ready.connect(self.evaluate_tab.receive_trained_model)
         
         main_layout.addWidget(self.content_stack, 1)
     
@@ -89,7 +94,7 @@ class SignalDashboard(QMainWindow):
         tab_layout.setSpacing(0)
         
         self.tab_buttons = []
-        tabs = ["Waveform Selection", "Channel & Noise", "ML Training", "Inference Results"]
+        tabs = ["Waveform Selection", "Channel & Noise", "ML Training", "Inference Results", "Evaluate Model"]
         
         for i, tab_name in enumerate(tabs):
             tab_btn = QPushButton(tab_name)

@@ -22,6 +22,9 @@ class TrainerThread(QThread):
     progress = Signal(int, int, float, float, float, float)
     finished = Signal(str)
 
+    # Match the notebook's signal length for ResNet1D
+    TARGET_LENGTH = 2048
+
     def __init__(self, file_label_pairs, labels, model_name='SimpleCNN', epochs=10, batch_size=32, lr=0.001, val_split=0.2):
         super().__init__()
         self.file_label_pairs = list(file_label_pairs)
@@ -33,6 +36,8 @@ class TrainerThread(QThread):
         self.val_split = float(val_split)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self._stop = False
+        if self.device.type == 'cuda':
+            torch.backends.cudnn.benchmark = True
         print(f"Using device: {self.device}")
 
     def stop(self):
@@ -132,16 +137,21 @@ class TrainerThread(QThread):
             self.finished.emit("")
             return
 
-        max_len = max([a.size for a in X_list])
-        if max_len == 0:
+        # Use fixed target length to match notebook preprocessing (2048)
+        # Raw waveform files can be very long (e.g. 98304); passing them
+        # untruncated makes convolutions ~24x slower than intended.
+        target_len = self.TARGET_LENGTH
+        if target_len <= 0:
+            target_len = max([a.size for a in X_list])
+        if target_len == 0:
             self.finished.emit("")
             return
 
-        # Pad/truncate to same length
-        X = np.zeros((len(X_list), max_len), dtype=np.float32)
+        # Pad/truncate to target length
+        X = np.zeros((len(X_list), target_len), dtype=np.float32)
         for i, a in enumerate(X_list):
-            L = min(len(a), max_len)
-            X[i, :L] = a[:L]
+            L = min(len(a), target_len)
+            X[i, :L] = a[:L].astype(np.float32)
 
         y = np.asarray(y_list, dtype=np.int64)
 
@@ -176,10 +186,12 @@ class TrainerThread(QThread):
         # Create DataLoaders with pin_memory if using GPU
         use_pin = (self.device.type == 'cuda')
         train_ds = TensorDataset(X_train, y_train)
-        train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True, pin_memory=use_pin)
+        train_loader = DataLoader(train_ds, batch_size=self.batch_size, shuffle=True,
+                                  pin_memory=use_pin)
 
         val_ds = TensorDataset(X_val, y_val)
-        val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False, pin_memory=use_pin)
+        val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False,
+                                pin_memory=use_pin)
 
         # Build model
         num_classes = len(self.labels)
@@ -231,7 +243,7 @@ class TrainerThread(QThread):
                     X_batch = X_batch.to(self.device, non_blocking=True)
                     y_batch = y_batch.to(self.device, non_blocking=True)
 
-                    optimizer.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
                     
                     # Mixed Precision Forward
                     with autocast(enabled=torch.cuda.is_available()):

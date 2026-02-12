@@ -98,7 +98,7 @@ class MLTrainingTab(QWidget):
         self.batch_spin = QSpinBox()
         self.batch_spin.setMinimum(1)
         self.batch_spin.setMaximum(1024)
-        self.batch_spin.setValue(32)
+        self.batch_spin.setValue(64)
         epoch_layout.addWidget(self.batch_spin)
 
         layout.addLayout(epoch_layout)

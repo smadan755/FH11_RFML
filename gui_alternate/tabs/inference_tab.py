@@ -304,11 +304,13 @@ class InferenceResultsTab(QWidget):
                 self.data_label.setText("Failed to load any files")
                 return
 
-            max_len = max(a.size for a in X_list)
-            X = np.zeros((len(X_list), max_len), dtype=np.float32)
+            # Use same target length as trainer to keep inference fast
+            from backend.trainer import TrainerThread
+            target_len = TrainerThread.TARGET_LENGTH
+            X = np.zeros((len(X_list), target_len), dtype=np.float32)
             for i, a in enumerate(X_list):
-                L = min(len(a), max_len)
-                X[i, :L] = a[:L]
+                L = min(len(a), target_len)
+                X[i, :L] = a[:L].astype(np.float32)
 
             # Determine input shape from metadata
             is_iq = (self.model_metadata or {}).get('model_name', '') in IQ_MODELS
@@ -384,16 +386,26 @@ class InferenceResultsTab(QWidget):
     # Evaluation methods
     # ------------------------------------------------------------------
 
+    def _batched_inference(self, batch_size=64):
+        """Run model inference in batches to avoid OOM."""
+        all_outputs = []
+        self.model.eval()
+        with torch.no_grad():
+            for i in range(0, len(self.eval_data), batch_size):
+                batch = self.eval_data[i:i + batch_size]
+                out = self.model(batch)
+                all_outputs.append(out)
+        return torch.cat(all_outputs, dim=0)
+
     def evaluate_confusion_matrix(self):
         """Compute and display confusion matrix"""
         if self.model is None or self.eval_data is None:
             return
-        
+
         try:
-            with torch.no_grad():
-                outputs = self.model(self.eval_data)
-                _, predictions = outputs.max(1)
-            
+            outputs = self._batched_inference()
+            _, predictions = outputs.max(1)
+
             y_pred = predictions.cpu().numpy()
             labels_list = self.class_labels if self.class_labels else None
             cm = confusion_matrix(self.eval_labels, y_pred)
@@ -427,12 +439,11 @@ class InferenceResultsTab(QWidget):
         """Compute and display classification report"""
         if self.model is None or self.eval_data is None:
             return
-        
+
         try:
-            with torch.no_grad():
-                outputs = self.model(self.eval_data)
-                _, predictions = outputs.max(1)
-            
+            outputs = self._batched_inference()
+            _, predictions = outputs.max(1)
+
             y_pred = predictions.cpu().numpy()
             target_names = self.class_labels if self.class_labels else None
             report = classification_report(self.eval_labels, y_pred,
@@ -449,15 +460,14 @@ class InferenceResultsTab(QWidget):
         """Compute and display ROC curve (binary classification only)"""
         if self.model is None or self.eval_data is None:
             return
-        
+
         try:
-            with torch.no_grad():
-                outputs = self.model(self.eval_data)
-                # Get probabilities for class 1
-                if outputs.shape[1] == 2:
-                    probs = torch.nn.functional.softmax(outputs, dim=1)[:, 1].cpu().numpy()
-                else:
-                    probs = outputs[:, 0].cpu().numpy()
+            outputs = self._batched_inference()
+            # Get probabilities for class 1
+            if outputs.shape[1] == 2:
+                probs = torch.nn.functional.softmax(outputs, dim=1)[:, 1].cpu().numpy()
+            else:
+                probs = outputs[:, 0].cpu().numpy()
             
             fpr, tpr, _ = roc_curve(self.eval_labels, probs)
             roc_auc = auc(fpr, tpr)
