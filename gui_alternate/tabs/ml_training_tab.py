@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QPushButton, QComboBox, QGridLayout, QFrame, QProgressBar, QFileDialog, QListWidget, QListWidgetItem)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 import os
 import numpy as np
@@ -11,7 +11,9 @@ from widgets.training_chart import TrainingChartWidget
 
 class MLTrainingTab(QWidget):
     """ML Training configuration and visualization tab"""
-    
+    # Emitted when a model finishes training: (model_path, class_labels_list)
+    trained_model_ready = Signal(str, list)
+
     def __init__(self):
         super().__init__()
         self.setup_ui()
@@ -51,6 +53,11 @@ class MLTrainingTab(QWidget):
         self.add_data_btn.clicked.connect(self.add_data_folder)
         data_btn_layout.addWidget(self.add_data_btn)
 
+        self.quick_load_btn = QPushButton("📦 Quick Load Dataset")
+        self.quick_load_btn.setToolTip("Auto-load class folders from waveform_data/ directory")
+        self.quick_load_btn.clicked.connect(self.quick_load_dataset)
+        data_btn_layout.addWidget(self.quick_load_btn)
+
         self.remove_data_btn = QPushButton("Remove Selected")
         self.remove_data_btn.clicked.connect(self.remove_selected_dataset)
         self.remove_data_btn.setEnabled(False)
@@ -72,8 +79,7 @@ class MLTrainingTab(QWidget):
         arch_label = QLabel("Model Architecture")
         layout.addWidget(arch_label)
         self.model_combo = QComboBox()
-        # Provide a few TF-ready model options with default params
-        self.model_combo.addItems(["SimpleCNN", "TinyConv", "MLP"])
+        self.model_combo.addItems(["SimpleCNN", "TinyConv", "MLP", "ResNet1DOptimized"])
         layout.addWidget(self.model_combo)
 
         # Epochs and batch size controls
@@ -178,8 +184,36 @@ class MLTrainingTab(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Data Folder", os.path.expanduser("~"))
         if not folder:
             return
+
+        # Check if folder contains class subfolders (each subfolder = a class)
+        subdirs = [d for d in sorted(os.listdir(folder))
+                   if os.path.isdir(os.path.join(folder, d))]
+        subdir_with_files = []
+        for d in subdirs:
+            files = self._gather_dataset_files(os.path.join(folder, d))
+            if files:
+                subdir_with_files.append((d, files))
+
+        if subdir_with_files:
+            # Auto-add each subfolder as a separate class
+            for sub_label, files in subdir_with_files:
+                label = sub_label
+                orig_label = label
+                i = 1
+                while label in self.datasets:
+                    label = f"{orig_label}_{i}"
+                    i += 1
+                self.datasets[label] = files
+                item = QListWidgetItem(f"{label} ({len(files)} files)")
+                item.setData(Qt.UserRole, label)
+                self.dataset_list.addItem(item)
+            self.clear_data_btn.setEnabled(True)
+            self.status_label.setText(f"Loaded {len(subdir_with_files)} classes from {os.path.basename(folder)}")
+            self._update_train_button_state()
+            return
+
+        # Fallback: treat folder itself as a single class
         label = os.path.basename(folder.rstrip(os.sep)) or folder
-        # ensure unique label
         orig_label = label
         i = 1
         while label in self.datasets:
@@ -188,7 +222,7 @@ class MLTrainingTab(QWidget):
 
         files = self._gather_dataset_files(folder)
         if not files:
-            self.status_label.setText("No supported files in selected folder")
+            self.status_label.setText("No supported files (.npy/.npz/.csv) found")
             return
 
         self.datasets[label] = files
@@ -226,7 +260,13 @@ class MLTrainingTab(QWidget):
     def _update_train_button_state(self):
         # enable training only when there are at least two classes with files
         valid_classes = [k for k, v in self.datasets.items() if v]
-        self.train_btn.setEnabled(len(valid_classes) >= 2)
+        can_train = len(valid_classes) >= 2
+        self.train_btn.setEnabled(can_train)
+        if valid_classes and not can_train:
+            self.status_label.setText(
+                f"Need at least 2 classes to train (currently {len(valid_classes)}). "
+                "Add more data folders or use Batch Generate on the Waveform tab."
+            )
 
     def _gather_dataset_files(self, folder):
         """Return list of candidate data files in folder (.npy, .npz, .csv)."""
@@ -316,7 +356,7 @@ class MLTrainingTab(QWidget):
             
             # Legend
             legend = self.create_legend(
-                [("→ Training Accuracy", "#10b981"), ("→ Validation Accuracy", "#a855f7")]
+                [("→ Training Accuracy", "#3b82f6"), ("→ Validation Accuracy", "#fb923c")]
             )
         
         layout.addLayout(legend)
@@ -338,6 +378,47 @@ class MLTrainingTab(QWidget):
         legend_layout.addStretch()
         return legend_layout
     
+    def quick_load_dataset(self):
+        """Auto-load class folders from waveform_data/ directory."""
+        # Use script directory rather than CWD to find waveform_data
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(script_dir)  # parent of tabs/
+        waveform_dir = os.path.join(base_dir, 'waveform_data')
+
+        # Fallback to CWD if not found relative to script
+        if not os.path.isdir(waveform_dir):
+            waveform_dir = os.path.join(os.getcwd(), 'waveform_data')
+
+        if not os.path.isdir(waveform_dir):
+            self.status_label.setText("No waveform_data/ directory found")
+            return
+
+        self.clear_datasets()
+        loaded = 0
+        for entry in sorted(os.listdir(waveform_dir)):
+            class_dir = os.path.join(waveform_dir, entry)
+            if not os.path.isdir(class_dir):
+                continue
+            files = self._gather_dataset_files(class_dir)
+            if not files:
+                continue
+            label = entry
+            self.datasets[label] = files
+            item = QListWidgetItem(f"{label} ({len(files)} files)")
+            item.setData(Qt.UserRole, label)
+            self.dataset_list.addItem(item)
+            loaded += 1
+
+        if loaded > 0:
+            self.clear_data_btn.setEnabled(True)
+            self.status_label.setText(f"Loaded {loaded} classes from waveform_data/")
+        else:
+            self.status_label.setText(
+                f"No class subfolders with data found in {waveform_dir}. "
+                "Use Batch Generate on the Waveform tab first."
+            )
+        self._update_train_button_state()
+
     def start_training(self):
         """Handle training start button click"""
         # Lazy import to avoid breaking app if torch not installed
@@ -370,9 +451,19 @@ class MLTrainingTab(QWidget):
         epochs = int(self.epochs_spin.value())
         batch_size = int(self.batch_spin.value())
 
+        # Update progress bar max and clear charts
+        self.progress_bar.setMaximum(epochs)
+        self.progress_bar.setValue(0)
+        self.progress_value.setText(f"Epoch 0/{epochs}")
+        self.loss_chart.clear_data()
+        self.acc_chart.clear_data()
+
         self._trainer = TrainerThread(file_label_pairs, labels, model_name=model_name, epochs=epochs, batch_size=batch_size)
         self._trainer.progress.connect(self.update_training_progress)
         self._trainer.finished.connect(self.on_training_finished)
+
+        # Store labels for signal emission later
+        self._training_labels = labels
 
         self.status_label.setText("Training...")
         self.train_btn.setEnabled(False)
@@ -408,6 +499,9 @@ class MLTrainingTab(QWidget):
         if model_path:
             self.status_label.setText(f"Training finished — saved: {model_path}")
             print(f"Model saved to: {model_path}")
+            # Notify inference tab
+            labels = getattr(self, '_training_labels', [])
+            self.trained_model_ready.emit(model_path, labels)
         else:
             self.status_label.setText("Training finished (no model saved)")
         self.train_btn.setEnabled(True)

@@ -59,6 +59,9 @@ class SignalDashboard(QMainWindow):
         
         self.inference_tab = InferenceResultsTab()
         self.content_stack.addWidget(self.inference_tab)
+
+        # Wire training → inference: auto-load trained model in inference tab
+        self.ml_training_tab.trained_model_ready.connect(self.inference_tab.receive_trained_model)
         
         main_layout.addWidget(self.content_stack, 1)
     

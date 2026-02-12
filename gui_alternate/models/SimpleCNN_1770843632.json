@@ -1,0 +1,14 @@
+{
+  "model_name": "SimpleCNN",
+  "class_labels": [
+    "FHSS",
+    "FSK",
+    "PAM",
+    "PSK",
+    "QAM"
+  ],
+  "num_classes": 5,
+  "input_channels": 1,
+  "signal_length": 98304,
+  "timestamp": 1770843632
+}

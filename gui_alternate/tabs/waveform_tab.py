@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QComboBox, QSpinBox, QFrame,
                                QSlider, QGridLayout, QTabWidget, QDoubleSpinBox,
-                               QLineEdit, QMessageBox)
+                               QLineEdit, QMessageBox, QProgressBar, QScrollArea)
 from PySide6.QtCore import Qt
 
 from widgets.waveform_plots import PlottingWidget, FreqDomainPlot, IQDomainPlot, SpectrogramPlot
 from gui_elements import Waveform
 import numpy as np
+import os
 
 
 class WaveformSelectionTab(QWidget):
@@ -26,6 +27,11 @@ class WaveformSelectionTab(QWidget):
         self.span = 8         # symbols
         self.modulation = "PAM"
 
+        # Last generated signal (for Save to Dataset)
+        self._last_signal = None
+        self._last_modulation = None
+        self._gen_thread = None
+
         self.setup_ui()
     
     def setup_ui(self):
@@ -42,23 +48,12 @@ class WaveformSelectionTab(QWidget):
         layout.addWidget(right_panel, 2)
     
     def create_configuration_panel(self):
-        """Create the RF signal configuration panel"""
-        panel = QFrame()
-        panel.setObjectName("card")
-        layout = QVBoxLayout(panel)
+        """Create the RF signal configuration panel (scrollable)"""
+        # Inner widget holds all controls
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(10)
-        
-        # Title
-        #title_layout = QVBoxLayout()
-        #title = QLabel("📡 RF Signal Configuration")
-        #title.setProperty("class", "section-title")
-        #subtitle = QLabel("Configure signal generation parameters")
-        #subtitle.setProperty("class", "section-subtitle")
-        #title_layout.addWidget(title)
-        #title_layout.addWidget(subtitle)
-        #title_layout.setSpacing(4)
-        #layout.addLayout(title_layout)
 
         # Waveform (Modulation Type)
         layout.addWidget(QLabel("Waveform"))
@@ -104,7 +99,6 @@ class WaveformSelectionTab(QWidget):
         self.alpha_spin.valueChanged.connect(lambda v: setattr(self, "alpha", v))
         layout.addWidget(self.alpha_spin)
 
-
         # Tsymb
         layout.addWidget(QLabel("Symbol Period Tsymb (s)"))
         self.tsymb_spin = QDoubleSpinBox()
@@ -114,7 +108,6 @@ class WaveformSelectionTab(QWidget):
         self.tsymb_spin.setValue(self.Tsymb)
         self.tsymb_spin.valueChanged.connect(lambda v: setattr(self, "Tsymb", v))
         layout.addWidget(self.tsymb_spin)
-
 
         # M
         layout.addWidget(QLabel("Modulation Order M"))
@@ -147,22 +140,65 @@ class WaveformSelectionTab(QWidget):
         layout.addWidget(self.span_spin)
 
         # Pulse Shape
-        pulse_label = QLabel("Pulse Shape")
-        layout.addWidget(pulse_label)
-
+        layout.addWidget(QLabel("Pulse Shape"))
         self.pulse_shape_combo = QComboBox()
         self.pulse_shape_combo.addItems(["rrc", "rect"])
         self.pulse_shape_combo.setCurrentText("rrc")
         layout.addWidget(self.pulse_shape_combo)
 
-        #layout.addStretch()
+        # --- Action buttons ---
+        layout.addSpacing(8)
 
-
-        generate_btn = QPushButton("▶ Generate Dataset")
+        generate_btn = QPushButton("▶ Generate Waveform")
         generate_btn.clicked.connect(self.generate_dataset)
+        generate_btn.setMinimumHeight(32)
         layout.addWidget(generate_btn)
-        
-        return panel
+
+        # Save / Batch generate
+        save_layout = QHBoxLayout()
+        self.save_btn = QPushButton("💾 Save to Dataset")
+        self.save_btn.setToolTip("Save last generated waveform to waveform_data/<modulation>/")
+        self.save_btn.clicked.connect(self.save_to_dataset)
+        self.save_btn.setEnabled(False)
+        self.save_btn.setMinimumHeight(32)
+        save_layout.addWidget(self.save_btn)
+
+        self.batch_btn = QPushButton("📦 Batch Generate")
+        self.batch_btn.setToolTip("Generate N samples per modulation class")
+        self.batch_btn.clicked.connect(self.batch_generate)
+        self.batch_btn.setMinimumHeight(32)
+        save_layout.addWidget(self.batch_btn)
+        layout.addLayout(save_layout)
+
+        # Batch generation controls
+        batch_ctrl = QHBoxLayout()
+        batch_ctrl.addWidget(QLabel("Samples / class:"))
+        self.batch_count_spin = QSpinBox()
+        self.batch_count_spin.setRange(1, 5000)
+        self.batch_count_spin.setValue(50)
+        batch_ctrl.addWidget(self.batch_count_spin)
+        layout.addLayout(batch_ctrl)
+
+        # Batch progress
+        self.batch_progress = QProgressBar()
+        self.batch_progress.setTextVisible(True)
+        self.batch_progress.setValue(0)
+        self.batch_progress.setVisible(False)
+        layout.addWidget(self.batch_progress)
+
+        self.batch_status = QLabel("")
+        self.batch_status.setProperty("class", "stat-label")
+        layout.addWidget(self.batch_status)
+
+        layout.addStretch()
+
+        # Wrap in scroll area
+        scroll = QScrollArea()
+        scroll.setObjectName("card")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(inner)
+        return scroll
     
     def create_slider_control(self, label, value, unit, min_val, max_val, attr_name):
         """Create a slider control with label and value display"""
@@ -259,6 +295,11 @@ class WaveformSelectionTab(QWidget):
             T = len(data) / fs
             t = np.linspace(0, T, len(data))
 
+            # Store for Save to Dataset
+            self._last_signal = data
+            self._last_modulation = modulation
+            self.save_btn.setEnabled(True)
+
             # Compute frequency spectrum using MATLAB
             freqs, ft = self.eng.plotspec_gui(data, 1 / fs, nargout=2)
             freqs = np.array(freqs).flatten()
@@ -289,4 +330,77 @@ class WaveformSelectionTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
 
+    # ------------------------------------------------------------------
+    # Dataset saving
+    # ------------------------------------------------------------------
 
+    def save_to_dataset(self):
+        """Save the last generated waveform to waveform_data/<modulation>/."""
+        if self._last_signal is None:
+            QMessageBox.information(self, "No Data", "Generate a waveform first.")
+            return
+
+        mod = self._last_modulation or "Unknown"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(script_dir)  # parent of tabs/
+        out_dir = os.path.join(base_dir, 'waveform_data', mod)
+        os.makedirs(out_dir, exist_ok=True)
+
+        # Find next index
+        existing = [f for f in os.listdir(out_dir) if f.endswith('.npy')]
+        idx = len(existing)
+        save_path = os.path.join(out_dir, f"data_{idx}.npy")
+        np.save(save_path, self._last_signal)
+        self.batch_status.setText(f"Saved: {save_path}")
+
+    def batch_generate(self):
+        """Launch batch dataset generation across modulation classes."""
+        from backend.dataset_generator import DatasetGeneratorThread
+
+        modulations = [self.waveform_combo.itemText(i) for i in range(self.waveform_combo.count())]
+        samples = self.batch_count_spin.value()
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(script_dir)  # parent of tabs/
+        out_dir = os.path.join(base_dir, 'waveform_data')
+
+        # Current waveform params as defaults for the generator
+        params = {
+            'fs': float(self.fs),
+            'Tsymb': float(self.Tsymb),
+            'Nsymb': int(self.Nsymb),
+            'fc': float(self.fc),
+            'alpha': float(self.alpha),
+            'span': int(self.span),
+            'pulse_shape': self.pulse_shape_combo.currentText(),
+        }
+
+        self._gen_thread = DatasetGeneratorThread(
+            matlab_engine=self.eng,
+            modulations=modulations,
+            samples_per_class=samples,
+            output_dir=out_dir,
+            waveform_params=params,
+        )
+        self._gen_thread.sample_progress.connect(self._on_batch_progress)
+        self._gen_thread.generation_finished.connect(self._on_batch_finished)
+        self._gen_thread.error_occurred.connect(lambda msg: self.batch_status.setText(msg))
+
+        self.batch_progress.setMaximum(samples * len(modulations))
+        self.batch_progress.setValue(0)
+        self.batch_progress.setVisible(True)
+        self.batch_btn.setEnabled(False)
+        self.batch_status.setText("Generating...")
+        self._gen_thread.start()
+
+    def _on_batch_progress(self, current, total):
+        self.batch_progress.setValue(current)
+        self.batch_status.setText(f"Generating: {current}/{total}")
+
+    def _on_batch_finished(self, out_dir):
+        self.batch_progress.setVisible(False)
+        self.batch_btn.setEnabled(True)
+        self.batch_status.setText(f"Done! Dataset saved to {out_dir}")
+        if self._gen_thread:
+            self._gen_thread.quit()
+            self._gen_thread.wait()
+            self._gen_thread = None
