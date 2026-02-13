@@ -1,0 +1,14 @@
+{
+  "model_name": "ResNet1DOptimized",
+  "class_labels": [
+    "FHSS",
+    "FSK",
+    "PAM",
+    "PSK",
+    "QAM"
+  ],
+  "num_classes": 5,
+  "input_channels": 2,
+  "signal_length": 1024,
+  "timestamp": 1770936209
+}

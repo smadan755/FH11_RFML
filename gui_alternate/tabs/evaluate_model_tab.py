@@ -116,7 +116,10 @@ class EvaluateModelTab(QWidget):
 
         layout.addWidget(QLabel("Waveform"))
         self.waveform_combo = QComboBox()
-        self.waveform_combo.addItems(["PAM", "QAM", "PSK", "FSK", "FHSS"])
+        self.waveform_combo.addItems(["PAM", "QAM", "PSK", "FSK", "FHSS",
+                                          "LFM", "Barker", "FMCW",
+                                          "WiFi", "LTE", "5G_NR"])
+        self.waveform_combo.currentTextChanged.connect(self._on_waveform_changed)
         layout.addWidget(self.waveform_combo)
 
         layout.addWidget(QLabel("Sampling Frequency fs (Hz)"))
@@ -320,6 +323,38 @@ class EvaluateModelTab(QWidget):
         except Exception as e:
             self.model_label.setText(f"Failed: {e}")
             print(f"Error loading model: {e}")
+
+    # ------------------------------------------------------------------
+    # Smart defaults per waveform type
+    # ------------------------------------------------------------------
+
+    _WAVEFORM_PRESETS = {
+        'PAM':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 4},
+        'QAM':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 16},
+        'PSK':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 8},
+        'FSK':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 4},
+        'FHSS':   {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 8},
+        'LFM':    {'fs': 1e6, 'fc': 200e3, 'Tsymb': 1e-4, 'M': 4},
+        'Barker': {'fs': 1e6, 'fc': 200e3, 'Tsymb': 5e-5, 'M': 7},
+        'FMCW':   {'fs': 1e6, 'fc': 200e3, 'Tsymb': 1e-4, 'M': 4},
+        'WiFi':   {'fs': 1e6, 'fc': 250e3, 'M': 4},
+        'LTE':    {'fs': 1e6, 'fc': 250e3, 'M': 4},
+        '5G_NR':  {'fs': 1e6, 'fc': 250e3, 'M': 4},
+    }
+
+    def _on_waveform_changed(self, modulation):
+        """Update parameter spin-boxes with sensible defaults for the selected waveform."""
+        preset = self._WAVEFORM_PRESETS.get(modulation, {})
+        if not preset:
+            return
+        if 'fs' in preset:
+            self.fs_spin.setValue(preset['fs'])
+        if 'fc' in preset:
+            self.fc_spin.setValue(preset['fc'])
+        if 'Tsymb' in preset:
+            self.tsymb_spin.setValue(preset['Tsymb'])
+        if 'M' in preset:
+            self.M_spin.setValue(preset['M'])
 
     # ------------------------------------------------------------------
     # Generate waveform + classify

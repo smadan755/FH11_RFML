@@ -122,25 +122,32 @@ class MLTrainingTab(QWidget):
         
         # Training Parameters
         #layout.addSpacing(10)
+
+        # Training Parameters
         params_layout = QGridLayout()
-        #params_layout.setSpacing(12)
         
-        self.params = {
-            "Training Samples": "8,000",
-            "Validation Samples": "2,000",
-            "Batch Size": "32",
-            "Epochs": "10"
+        # We define these as class attributes so we can access them in update_training_progress
+        self.val_labels = {
+            "Training Samples": QLabel("0"),
+            "Validation Samples": QLabel("0"),
+            "Batch Size": QLabel(str(self.batch_spin.value())),
+            "Epochs": QLabel(str(self.epochs_spin.value()))
         }
         
-        for i, (label, value) in enumerate(self.params.items()):
+        for i, (label, widget) in enumerate(self.val_labels.items()):
             label_widget = QLabel(label)
             label_widget.setProperty("class", "stat-label")
-            value_widget = QLabel(value)
-            value_widget.setProperty("class", "stat-value")
-            value_widget.setAlignment(Qt.AlignRight)
+            
+            widget.setProperty("class", "stat-value")
+            widget.setAlignment(Qt.AlignRight)
+            
             params_layout.addWidget(label_widget, i, 0)
-            params_layout.addWidget(value_widget, i, 1)
-        
+            params_layout.addWidget(widget, i, 1)
+            
+        # Connect changes in input to the display labels immediately
+        self.batch_spin.valueChanged.connect(lambda v: self.val_labels["Batch Size"].setText(str(v)))
+        self.epochs_spin.valueChanged.connect(lambda v: self.val_labels["Epochs"].setText(str(v)))
+
         layout.addLayout(params_layout)
         
         # Progress section
@@ -445,6 +452,14 @@ class MLTrainingTab(QWidget):
         if not file_label_pairs:
             self.status_label.setText("No supported files found in datasets")
             return
+        
+        total_files = len(file_label_pairs)
+        train_count = int(total_files * 0.8) # Assuming 80/20 split in your trainer
+        val_count = total_files - train_count
+        
+        # Update the UI labels with ACTUAL data numbers
+        self.val_labels["Training Samples"].setText(f"{train_count:,}")
+        self.val_labels["Validation Samples"].setText(f"{val_count:,}")
 
         # start TrainerThread
         model_name = self.model_combo.currentText()
@@ -469,31 +484,34 @@ class MLTrainingTab(QWidget):
         self.train_btn.setEnabled(False)
         self._trainer.start()
         print(f"Trainer started: model={model_name}, epochs={epochs}, batch_size={batch_size}")
-    
-    def update_training_progress(self, epoch, total_epochs, train_loss, val_loss, train_acc, val_acc):
-        """Update the training progress and charts
         
-        Args:
-            epoch: Current epoch number
-            total_epochs: Total number of epochs
-            train_loss: Training loss value
-            val_loss: Validation loss value
-            train_acc: Training accuracy value
-            val_acc: Validation accuracy value
-        """
+    def update_training_progress(self, epoch, total_epochs, train_loss, val_loss, train_acc, val_acc):
+        """Update the training progress and labels with dynamic values"""
+        
+        # 1. Update Progress Bar & Text
         self.progress_bar.setValue(epoch)
         self.progress_value.setText(f"Epoch {epoch}/{total_epochs}")
         
-        # Update loss chart
+        # 2. Update Charts
         self.loss_chart.add_data_point(train_loss, val_loss)
-        
-        # Update accuracy chart
         self.acc_chart.add_data_point(train_acc, val_acc)
         
+        # 3. Update the Grid Labels (Dynamic values)
+        # We can use the 'Epochs' label to show current/total
+        self.val_labels["Epochs"].setText(f"{epoch} / {total_epochs}")
+        
+        # 4. Update Status Label
+        # Multiplying by 100 assuming trainer sends 0.0-1.0 range
+        metrics_text = f"Epoch {epoch}: Loss {train_loss:.4f} | Acc {train_acc*100:.1f}%"
+        self.status_label.setText(metrics_text)
+
+        # 5. Handle Completion
         if epoch >= total_epochs:
-            self.status_label.setText("Training Complete")
+            self.status_label.setText(f"✅ Complete | Final Acc: {val_acc*100:.1f}%")
             self.train_btn.setEnabled(True)
             self.train_btn.setText("▶  Start Training")
+    
+
 
     def on_training_finished(self, model_path):
         if model_path:

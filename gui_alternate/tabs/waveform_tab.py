@@ -58,7 +58,10 @@ class WaveformSelectionTab(QWidget):
         # Waveform (Modulation Type)
         layout.addWidget(QLabel("Waveform"))
         self.waveform_combo = QComboBox()
-        self.waveform_combo.addItems(["PAM", "QAM", "PSK", "FSK", "FHSS"])
+        self.waveform_combo.addItems(["PAM", "QAM", "PSK", "FSK", "FHSS",
+                                          "LFM", "Barker", "FMCW",
+                                          "WiFi", "LTE", "5G_NR"])
+        self.waveform_combo.currentTextChanged.connect(self._on_waveform_changed)
         layout.addWidget(self.waveform_combo)
 
         # fs
@@ -253,6 +256,40 @@ class WaveformSelectionTab(QWidget):
         
         return panel
 
+    # Suggested parameter presets per waveform type.
+    # Only fields that differ from the class __init__ defaults are listed.
+    _WAVEFORM_PRESETS = {
+        # Classic modulations restore the standard defaults
+        'PAM':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 4},
+        'QAM':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 16},
+        'PSK':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 8},
+        'FSK':    {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 4},
+        'FHSS':   {'fs': 48e3, 'fc': 6e3, 'Tsymb': 1e-3, 'M': 8},
+        # Radar waveforms need higher fs & fc for wideband chirps
+        'LFM':    {'fs': 1e6, 'fc': 200e3, 'Tsymb': 1e-4, 'M': 4},
+        'Barker': {'fs': 1e6, 'fc': 200e3, 'Tsymb': 5e-5, 'M': 7},
+        'FMCW':   {'fs': 1e6, 'fc': 200e3, 'Tsymb': 1e-4, 'M': 4},
+        # Standards-based: higher fs to capture wider bandwidth
+        'WiFi':   {'fs': 1e6, 'fc': 250e3, 'M': 4},
+        'LTE':    {'fs': 1e6, 'fc': 250e3, 'M': 4},
+        '5G_NR':  {'fs': 1e6, 'fc': 250e3, 'M': 4},
+    }
+
+    def _on_waveform_changed(self, modulation):
+        """Update parameter spin-boxes with sensible defaults for the selected waveform."""
+        preset = self._WAVEFORM_PRESETS.get(modulation, {})
+        if not preset:
+            return
+
+        if 'fs' in preset:
+            self.fs_spin.setValue(preset['fs'])
+        if 'fc' in preset:
+            self.fc_spin.setValue(preset['fc'])
+        if 'Tsymb' in preset:
+            self.tsymb_spin.setValue(preset['Tsymb'])
+        if 'M' in preset:
+            self.M_spin.setValue(preset['M'])
+
     def generate_dataset(self):
         """Generate and plot waveform — mirrors original GUI's click_button()"""
         try:
@@ -289,6 +326,8 @@ class WaveformSelectionTab(QWidget):
             # Generate the waveform data
             waveform.generate_data()
             data = waveform.get_data()
+            
+            # modulation_type = waveform.get_modulation()
 
             # Get waveform parameters
             sps = waveform.get_sps()
@@ -306,8 +345,8 @@ class WaveformSelectionTab(QWidget):
             ft = np.array(ft).flatten()
 
             # Update all plots
-            self.waveform_plot.plot_data(t, data)
-            self.freq_plot.plot_data(freqs, np.abs(ft))
+            self.waveform_plot.plot_data(t, data, modulation)
+            self.freq_plot.plot_data(freqs, np.abs(ft),modulation)
             self.spectrogram_plot.plot_data(data, fs, modulation=modulation)
 
             # IQ plot — pass MATLAB engine for matched filter

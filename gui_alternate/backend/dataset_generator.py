@@ -45,13 +45,35 @@ class DatasetGeneratorThread(QThread):
         'pulse_shape': 'rrc',
     }
 
+    # Per-waveform default overrides.
+    # Standards-based waveforms need higher sample rates because their MATLAB
+    # generators produce wideband signals (20 MHz+ native) that are resampled
+    # to the target fs.  Radar waveforms benefit from larger fc headroom.
+    _WAVEFORM_DEFAULTS = {
+        'LFM':    {'fs': 1e6, 'fc': 200e3, 'Tsymb': 1e-4},
+        'Barker': {'fs': 1e6, 'fc': 200e3, 'Tsymb': 5e-5},
+        'FMCW':   {'fs': 1e6, 'fc': 200e3, 'Tsymb': 1e-4},
+        'WiFi':   {'fs': 1e6, 'fc': 250e3},
+        'LTE':    {'fs': 1e6, 'fc': 250e3},
+        '5G_NR':  {'fs': 1e6, 'fc': 250e3},
+    }
+
     # How M maps to each modulation
     _M_MAP = {
-        'PAM':  [2, 4, 8],
-        'QAM':  [4, 16, 64],
-        'PSK':  [2, 4, 8],
-        'FSK':  [2, 4, 8],
-        'OFDM': [4, 16, 64],
+        'PAM':   [2, 4, 8],
+        'QAM':   [4, 16, 64],
+        'PSK':   [2, 4, 8],
+        'FSK':   [2, 4, 8],
+        'FHSS':  [4, 8, 16],
+        'OFDM':  [4, 16, 64],
+        # Radar — M controls bandwidth/chips
+        'LFM':    [2, 4, 8],
+        'Barker': [5, 7, 11, 13],
+        'FMCW':   [2, 4, 8],
+        # Standards — M is unused but must be valid
+        'WiFi':  [4],
+        'LTE':   [4],
+        '5G_NR': [4],
     }
 
     # Variance range for additive noise
@@ -62,6 +84,11 @@ class DatasetGeneratorThread(QThread):
         rng = np.random.default_rng()
 
         params = dict(self._DEFAULTS)
+
+        # Apply per-waveform default overrides BEFORE user overrides
+        wf_overrides = self._WAVEFORM_DEFAULTS.get(modulation, {})
+        params.update(wf_overrides)
+
         params.update(self.waveform_params)  # user overrides
 
         # Pick a random M for the modulation type

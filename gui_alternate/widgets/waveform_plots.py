@@ -58,13 +58,13 @@ class PlottingWidget(QWidget):
         # Initial plot
         self.plot_data()
     
-    def plot_data(self, t=None, signal=None):
+    def plot_data(self, t=None, signal=None, modulation=None):
         """Generate and display a sample plot"""
         self.figure.clear()
         ax = self.figure.add_subplot(111)
      
         if (t is not None and signal is not None):
-            ax.plot(t, signal, color='#818cf8', label='Waveform')
+            ax.plot(t, signal, color='#818cf8', label=f'Waveform: {modulation}')
             ax.set_xlabel('Time (μs)')
             ax.set_ylabel('Amplitude')
             ax.set_title('Waveform Plot')
@@ -79,13 +79,13 @@ class FreqDomainPlot(PlottingWidget):
     def __init__(self):
         super().__init__()
 
-    def plot_data(self, freqs=None, fft=None):
+    def plot_data(self, freqs=None, fft=None, modulation = None):
         """Generate and display a sample plot"""
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
         if (freqs is not None and fft is not None):
-            ax.plot(freqs, fft, color='#818cf8', label='Waveform')
+            ax.plot(freqs, fft, color='#818cf8', label=f'Waveform: {modulation}')
             ax.set_xlabel('Frequency [MHz]')
             ax.set_ylabel('Magnitude')
             ax.set_title('Frequency Domain')
@@ -129,13 +129,24 @@ class IQDomainPlot(PlottingWidget):
             self._plot_fsk_trajectory(ax, data, fs, fc, sps, M)
         elif modulation == "FHSS":
             self._plot_fhss_trajectory(ax, data, fs, fc, sps, M)
+        elif modulation in ("LFM", "FMCW"):
+            self._plot_chirp_iq(ax, data, fs, fc, modulation, M)
+        elif modulation == "Barker":
+            self._plot_phase_coded_iq(ax, data, fs, fc, modulation, M)
+        elif modulation in ("WiFi", "LTE", "5G_NR"):
+            self._plot_ofdm_constellation(ax, data, fs, fc, modulation)
         else:
             self._plot_constellation(ax, data, fs, fc, sps, M, modulation,
                                      alpha, span, pulse_shape, nsymb, eng)
 
         _apply_dark_style(self.figure)
+        # Style colorbar text if present
+        for cbar_ax in self.figure.axes[1:]:
+            cbar_ax.tick_params(colors=_DARK_TEXT)
+            cbar_ax.yaxis.label.set_color(_DARK_TEXT)
+        self.figure.tight_layout()
         self.canvas.draw()
-    
+
     def _plot_constellation(self, ax, data, fs, fc, sps, M, modulation,
                             alpha, span, pulse_shape, nsymb, eng):
         """
@@ -288,6 +299,252 @@ class IQDomainPlot(PlottingWidget):
         
         self.figure.colorbar(scatter, ax=ax, label='Time')
     
+    # ------------------------------------------------------------------
+    # Radar waveforms: chirp IQ trajectory
+    # ------------------------------------------------------------------
+
+    def _plot_chirp_iq(self, ax, data, fs, fc, modulation, M):
+        """
+        Plot IQ trajectory for chirp-type radar waveforms (LFM, FMCW).
+
+        These signals sweep in frequency, so the IQ trajectory traces out
+        a spiral pattern. We downconvert to baseband, low-pass filter,
+        then plot I vs Q colored by time to show the frequency sweep.
+        """
+        t_demod = np.arange(len(data)) / fs
+
+        # Downconvert to complex baseband
+        complex_baseband = data * np.exp(-1j * 2 * np.pi * fc * t_demod)
+
+        # Low-pass filter — chirp bandwidth is roughly M * 100 kHz
+        bw_est = max(M * 1e5, fs * 0.1)  # At least 10% of fs
+        cutoff = min(bw_est * 0.6, fs / 2 * 0.9)
+        sos = signal.butter(4, cutoff, 'low', fs=fs, output='sos')
+        complex_baseband = 2 * signal.sosfilt(sos, complex_baseband)
+
+        # Downsample for cleaner visualization
+        downsample_factor = max(1, len(complex_baseband) // 5000)
+        I_viz = np.real(complex_baseband[::downsample_factor])
+        Q_viz = np.imag(complex_baseband[::downsample_factor])
+
+        # Normalize
+        max_amp = max(np.max(np.abs(I_viz)), np.max(np.abs(Q_viz)), 1e-10)
+        I_viz /= max_amp
+        Q_viz /= max_amp
+
+        time_colors = np.arange(len(I_viz))
+
+        scatter = ax.scatter(I_viz, Q_viz, c=time_colors,
+                            cmap='coolwarm', alpha=0.6, s=8)
+
+        # Also plot the trajectory as a thin line to show the spiral
+        ax.plot(I_viz, Q_viz, color='#818cf8', alpha=0.15, linewidth=0.5)
+
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+        ax.set_title(f"{modulation} IQ Trajectory (chirp sweep, M={int(M)})")
+        ax.axis('equal')
+        ax.grid(True, color=_DARK_GRID, alpha=0.3)
+        ax.axhline(y=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+        ax.axvline(x=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+
+        self.figure.colorbar(scatter, ax=ax, label='Time →')
+
+        # Add annotation about what the plot shows
+        ax.text(0.02, 0.98, 'Frequency sweep → spiral trajectory',
+               transform=ax.transAxes, fontsize=8, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    def _plot_phase_coded_iq(self, ax, data, fs, fc, modulation, M):
+        """
+        Plot IQ for phase-coded radar waveforms (Barker codes).
+
+        Barker codes use discrete phase shifts (0° / 180° for binary codes).
+        We downconvert and show symbol-rate samples to reveal the phase states.
+        """
+        t_demod = np.arange(len(data)) / fs
+
+        # Downconvert to complex baseband
+        complex_baseband = data * np.exp(-1j * 2 * np.pi * fc * t_demod)
+
+        # Low-pass filter — bandwidth ~ 2 * chip_rate
+        # Barker chip rate is roughly fs / (output_len / M)
+        cutoff = min(fs * 0.15, fs / 2 * 0.9)
+        sos = signal.butter(4, cutoff, 'low', fs=fs, output='sos')
+        complex_baseband = 2 * signal.sosfilt(sos, complex_baseband)
+
+        # Downsample for visualization
+        downsample_factor = max(1, len(complex_baseband) // 3000)
+        I_viz = np.real(complex_baseband[::downsample_factor])
+        Q_viz = np.imag(complex_baseband[::downsample_factor])
+
+        # Normalize
+        max_amp = max(np.max(np.abs(I_viz)), np.max(np.abs(Q_viz)), 1e-10)
+        I_viz /= max_amp
+        Q_viz /= max_amp
+
+        time_colors = np.arange(len(I_viz))
+
+        scatter = ax.scatter(I_viz, Q_viz, c=time_colors,
+                            cmap='viridis', alpha=0.6, s=12)
+
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+        ax.set_title(f"Barker-{int(M)} IQ Diagram (phase-coded)")
+        ax.axis('equal')
+        ax.grid(True, color=_DARK_GRID, alpha=0.3)
+        ax.axhline(y=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+        ax.axvline(x=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+
+        # Add ideal BPSK-like constellation points for reference
+        ax.scatter([1, -1], [0, 0], c='red', marker='x', s=100,
+                  linewidths=2, label='Ideal phases (0°, 180°)', zorder=5)
+        ax.legend(fontsize=8)
+
+        self.figure.colorbar(scatter, ax=ax, label='Time →')
+
+        ax.text(0.02, 0.98, f'Barker code: {int(M)} chips (binary phase)',
+               transform=ax.transAxes, fontsize=8, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    # ------------------------------------------------------------------
+    # OFDM-based waveforms: WiFi, LTE, 5G NR constellation
+    # ------------------------------------------------------------------
+
+    def _plot_ofdm_constellation(self, ax, data, fs, fc, modulation):
+        """
+        Plot OFDM subcarrier constellation for WiFi, LTE, 5G NR.
+
+        These waveforms use OFDM with QAM modulation on each subcarrier.
+        We downconvert to baseband, then perform FFT per OFDM symbol to
+        recover the per-subcarrier constellation points.
+        """
+        t_demod = np.arange(len(data)) / fs
+
+        # Downconvert to complex baseband
+        complex_baseband = data * np.exp(-1j * 2 * np.pi * fc * t_demod)
+
+        # Low-pass filter — use wider bandwidth for OFDM signals
+        cutoff = min(fs * 0.4, fs / 2 * 0.95)
+        sos = signal.butter(6, cutoff, 'low', fs=fs, output='sos')
+        complex_baseband = 2 * signal.sosfilt(sos, complex_baseband)
+
+        # Estimate OFDM symbol length based on modulation type
+        # Standard OFDM FFT sizes
+        ofdm_params = {
+            'WiFi':  {'nfft': 64,   'cp_len': 16},   # 802.11a/n/ac/ax
+            'LTE':   {'nfft': 128,  'cp_len': 9},     # LTE 1.4 MHz (128 subcarriers)
+            '5G_NR': {'nfft': 256,  'cp_len': 18},    # 5G NR with 256 subcarriers
+        }
+
+        params = ofdm_params.get(modulation, {'nfft': 64, 'cp_len': 16})
+        nfft = params['nfft']
+        cp_len = params['cp_len']
+        sym_len = nfft + cp_len  # Total OFDM symbol length including CP
+
+        # Try to extract OFDM symbols via FFT
+        # The signal may have been resampled, so scale the FFT size
+        # to match the actual sample rate
+        n_symbols = len(complex_baseband) // sym_len
+
+        if n_symbols < 1:
+            # Signal is too short for OFDM demod; fall back to raw IQ scatter
+            self._plot_raw_iq_scatter(ax, complex_baseband, modulation)
+            return
+
+        # Extract constellation points from each OFDM symbol
+        all_points = []
+        for i in range(min(n_symbols, 50)):  # Cap at 50 symbols for performance
+            start = i * sym_len + cp_len  # Skip cyclic prefix
+            end = start + nfft
+            if end > len(complex_baseband):
+                break
+
+            # FFT to get subcarrier values
+            symbol_freq = np.fft.fft(complex_baseband[start:end]) / np.sqrt(nfft)
+
+            # Keep only the active subcarriers (center ~75%)
+            n_active = int(nfft * 0.75)
+            half = n_active // 2
+            # Positive subcarriers + negative subcarriers (skip DC)
+            active = np.concatenate([
+                symbol_freq[1:half+1],
+                symbol_freq[-half:]
+            ])
+            all_points.extend(active)
+
+        if len(all_points) == 0:
+            self._plot_raw_iq_scatter(ax, complex_baseband, modulation)
+            return
+
+        constellation = np.array(all_points)
+
+        # Normalize to unit average power
+        avg_power = np.mean(np.abs(constellation)**2)
+        if avg_power > 0:
+            constellation = constellation / np.sqrt(avg_power)
+
+        I_pts = np.real(constellation)
+        Q_pts = np.imag(constellation)
+
+        # Color by symbol index for visual richness
+        n_per_sym = len(all_points) // max(n_symbols, 1)
+        if n_per_sym > 0:
+            sym_colors = np.repeat(np.arange(len(all_points) // n_per_sym + 1), n_per_sym)[:len(all_points)]
+        else:
+            sym_colors = np.arange(len(all_points))
+
+        scatter = ax.scatter(I_pts, Q_pts, c=sym_colors, cmap='viridis',
+                            alpha=0.4, s=8, edgecolors='none')
+
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+
+        display_names = {
+            'WiFi': 'WiFi 802.11ax',
+            'LTE': 'LTE Downlink',
+            '5G_NR': '5G NR Downlink'
+        }
+        ax.set_title(f"{display_names.get(modulation, modulation)} OFDM Constellation")
+        ax.axis('equal')
+        ax.grid(True, color=_DARK_GRID, alpha=0.3)
+        ax.axhline(y=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+        ax.axvline(x=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+
+        self.figure.colorbar(scatter, ax=ax, label='OFDM Symbol #')
+
+        ax.text(0.02, 0.98, f'FFT size: {nfft}, CP: {cp_len} samples',
+               transform=ax.transAxes, fontsize=8, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    def _plot_raw_iq_scatter(self, ax, complex_baseband, modulation):
+        """Fallback: raw IQ scatter when OFDM demod fails."""
+        # Downsample for visualization
+        downsample_factor = max(1, len(complex_baseband) // 5000)
+        I_viz = np.real(complex_baseband[::downsample_factor])
+        Q_viz = np.imag(complex_baseband[::downsample_factor])
+
+        # Normalize
+        avg_power = np.mean(I_viz**2 + Q_viz**2)
+        if avg_power > 0:
+            scale = np.sqrt(avg_power)
+            I_viz /= scale
+            Q_viz /= scale
+
+        time_colors = np.arange(len(I_viz))
+        scatter = ax.scatter(I_viz, Q_viz, c=time_colors, cmap='viridis',
+                            alpha=0.4, s=8, edgecolors='none')
+
+        ax.set_xlabel('In-phase (I)')
+        ax.set_ylabel('Quadrature (Q)')
+        ax.set_title(f"{modulation} Raw IQ Scatter")
+        ax.axis('equal')
+        ax.grid(True, color=_DARK_GRID, alpha=0.3)
+        ax.axhline(y=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+        ax.axvline(x=0, color=_DARK_GRID, linewidth=0.5, alpha=0.5)
+
+        self.figure.colorbar(scatter, ax=ax, label='Time →')
+
     def _add_ideal_qam_points(self, ax, M):
         """Add ideal QAM constellation points"""
         M = int(M)
@@ -395,8 +652,24 @@ class SpectrogramPlot(PlottingWidget):
                     "vmin_pct": 10, "vmax_pct": 95},
             "FSK": {"nperseg": 2048, "overlap": 0.85, "window": "blackman", 
                     "vmin_pct": 3, "vmax_pct": 97},
-            "OFDM": {"nperseg": 2048, "overlap": 0.80, "window": "hann", 
-                     "vmin_pct": 5, "vmax_pct": 90}
+            "OFDM": {"nperseg": 2048, "overlap": 0.80, "window": "hann",
+                     "vmin_pct": 5, "vmax_pct": 90},
+            # Radar waveforms
+            "LFM":    {"nperseg": 512,  "overlap": 0.90, "window": "hann",
+                       "vmin_pct": 3, "vmax_pct": 97},
+            "Barker": {"nperseg": 256,  "overlap": 0.85, "window": "hann",
+                       "vmin_pct": 5, "vmax_pct": 95},
+            "FMCW":   {"nperseg": 512,  "overlap": 0.90, "window": "hann",
+                       "vmin_pct": 3, "vmax_pct": 97},
+            # Standards-based
+            "WiFi":   {"nperseg": 2048, "overlap": 0.80, "window": "hann",
+                       "vmin_pct": 5, "vmax_pct": 92},
+            "LTE":    {"nperseg": 2048, "overlap": 0.80, "window": "hann",
+                       "vmin_pct": 5, "vmax_pct": 92},
+            "5G_NR":  {"nperseg": 2048, "overlap": 0.80, "window": "hann",
+                       "vmin_pct": 5, "vmax_pct": 92},
+            "FHSS":   {"nperseg": 2048, "overlap": 0.85, "window": "blackman",
+                       "vmin_pct": 3, "vmax_pct": 97}
         }
         
         return presets.get(self.current_modulation, default)

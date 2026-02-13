@@ -66,6 +66,10 @@ class WaveformConfig:
             self._validate_psk()
         elif self.modulation == "FHSS":
             self._validate_fhss()
+        elif self.modulation in ("LFM", "Barker", "FMCW"):
+            self._validate_radar()
+        elif self.modulation in ("WiFi", "LTE", "5G_NR"):
+            self._validate_standard()
         else:
             raise ValueError(f"Unknown modulation type: {self.modulation}")
     
@@ -101,7 +105,16 @@ class WaveformConfig:
         """FHSS: M is number of hopping channels, must be >= 2"""
         if self.M < 2:
             raise ValueError(f"FHSS requires M >= 2 hopping channels, got {self.M}")
-    
+
+    def _validate_radar(self):
+        """Radar waveforms (LFM, Barker, FMCW): M >= 2"""
+        if self.M < 2:
+            raise ValueError(f"{self.modulation} requires M >= 2, got {self.M}")
+
+    def _validate_standard(self):
+        """Standards-based waveforms (WiFi, LTE, 5G_NR): no strict M requirement"""
+        pass  # These use M loosely; MATLAB function handles defaults
+
     @staticmethod
     def _is_power_of_2(n):
         """Check if n is a power of 2"""

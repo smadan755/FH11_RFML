@@ -9,7 +9,7 @@ function sig_pb = waveform_generator(output_len, fs, Tsymb, fc, M, modulation, v
     %   Tsymb        - Symbol Period (s)
     %   fc           - Carrier Frequency (Hz)
     %   M            - Modulation order
-    %   modulation   - 'PAM', 'QAM', 'PSK', 'FSK', 'FHSS'
+    %   modulation   - 'PAM','QAM','PSK','FSK','FHSS','LFM','Barker','FMCW','WiFi','LTE','5G_NR'
     %   varargin     - Optional name-value pairs:
     %                  'alpha' (default 0.35) - RRC roll-off
     %                  'span' (default 8) - Filter span in symbols
@@ -70,7 +70,39 @@ function sig_pb = waveform_generator(output_len, fs, Tsymb, fc, M, modulation, v
         sig_pb = generate_fhss_signal(output_len, fs, Tsymb, fc, M);
         return;
     end
-    
+
+    %% ---- Advanced waveforms (toolbox-based) ----
+
+    if strcmpi(modulation, 'LFM')
+        sig_pb = generate_lfm_signal(output_len, fs, Tsymb, fc, M);
+        return;
+    end
+
+    if strcmpi(modulation, 'Barker')
+        sig_pb = generate_barker_signal(output_len, fs, Tsymb, fc, M);
+        return;
+    end
+
+    if strcmpi(modulation, 'FMCW')
+        sig_pb = generate_fmcw_signal(output_len, fs, Tsymb, fc, M);
+        return;
+    end
+
+    if strcmpi(modulation, 'WiFi')
+        sig_pb = generate_wifi_signal(output_len, fs, fc);
+        return;
+    end
+
+    if strcmpi(modulation, 'LTE')
+        sig_pb = generate_lte_signal(output_len, fs, fc);
+        return;
+    end
+
+    if strcmpi(modulation, '5G_NR')
+        sig_pb = generate_5gnr_signal(output_len, fs, fc);
+        return;
+    end
+
     %% Generate symbols based on modulation type
     symbols = generate_symbols(num_symbols, M, modulation);
     
@@ -259,6 +291,203 @@ function sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len)
     
     % Quadrature upconversion
     sig_pb = I .* carrier_I + Q .* carrier_Q;
+end
+
+
+%% ========================================================================
+%  ADVANCED WAVEFORM HELPERS (Toolbox-based)
+%% ========================================================================
+
+function sig_pb = generate_lfm_signal(output_len, fs, Tsymb, fc, M)
+    % GENERATE_LFM_SIGNAL - Linear Frequency Modulated (chirp) pulse
+    % Requires: Phased Array System Toolbox
+    try
+        sweep_bw = M * fs / 8;         % M scales the sweep bandwidth
+        pulse_width = Tsymb * 20;       % longer pulse for visible chirp
+        pulse_width = min(pulse_width, (output_len - 1) / fs);  % cap at signal length
+
+        % Snap pulse_width so it contains a whole number of samples
+        pulse_width = round(pulse_width * fs) / fs;
+
+        % PRF must satisfy: fs / PRF is an integer
+        pri_desired = pulse_width * 1.5;
+        pri_samples = max(round(pri_desired * fs), round(pulse_width * fs) + 1);
+        prf = fs / pri_samples;
+
+        wav = phased.LinearFMWaveform( ...
+            'SweepBandwidth', sweep_bw, ...
+            'PulseWidth', pulse_width, ...
+            'SampleRate', fs, ...
+            'PRF', prf, ...
+            'OutputFormat', 'Samples', ...
+            'NumSamples', output_len);
+        sig_bb = wav();
+        sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len);
+    catch ME
+        error('LFM generation failed (need Phased Array System Toolbox): %s', ME.message);
+    end
+end
+
+
+function sig_pb = generate_barker_signal(output_len, fs, Tsymb, fc, M)
+    % GENERATE_BARKER_SIGNAL - Phase-coded pulse using Barker sequence
+    % Requires: Phased Array System Toolbox
+    % M selects num_chips: valid Barker lengths are 2,3,4,5,7,11,13
+    try
+        valid_chips = [2 3 4 5 7 11 13];
+        [~, idx] = min(abs(valid_chips - M));
+        num_chips = valid_chips(idx);
+
+        chip_width = Tsymb;
+        chip_width = min(chip_width, (output_len - 1) / (fs * num_chips));
+
+        % Snap chip_width so it contains a whole number of samples (min 1)
+        chip_width = max(round(chip_width * fs), 1) / fs;
+
+        % PRF must satisfy: fs / PRF is an integer
+        pulse_dur = chip_width * num_chips;
+        pri_desired = pulse_dur * 1.5;
+        pri_samples = max(round(pri_desired * fs), round(pulse_dur * fs) + 1);
+        prf = fs / pri_samples;
+
+        wav = phased.PhaseCodedWaveform( ...
+            'Code', 'Barker', ...
+            'NumChips', num_chips, ...
+            'ChipWidth', chip_width, ...
+            'SampleRate', fs, ...
+            'PRF', prf, ...
+            'OutputFormat', 'Samples', ...
+            'NumSamples', output_len);
+        sig_bb = wav();
+        sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len);
+    catch ME
+        error('Barker generation failed (need Phased Array System Toolbox): %s', ME.message);
+    end
+end
+
+
+function sig_pb = generate_fmcw_signal(output_len, fs, Tsymb, fc, M)
+    % GENERATE_FMCW_SIGNAL - Frequency Modulated Continuous Wave
+    % Requires: Phased Array System Toolbox
+    try
+        sweep_bw = M * fs / 8;
+        sweep_time = Tsymb * 50;
+        sweep_time = min(sweep_time, (output_len - 1) / fs);
+
+        % Snap sweep_time so it contains a whole number of samples
+        sweep_time = max(round(sweep_time * fs), 1) / fs;
+
+        wav = phased.FMCWWaveform( ...
+            'SweepBandwidth', sweep_bw, ...
+            'SweepTime', sweep_time, ...
+            'SampleRate', fs, ...
+            'SweepDirection', 'Triangle', ...
+            'OutputFormat', 'Samples', ...
+            'NumSamples', output_len);
+        sig_bb = wav();
+        sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len);
+    catch ME
+        error('FMCW generation failed (need Phased Array System Toolbox): %s', ME.message);
+    end
+end
+
+
+function sig_pb = generate_wifi_signal(output_len, fs, fc)
+    % GENERATE_WIFI_SIGNAL - 802.11ax (WiFi 6) HE-SU packet
+    % Requires: WLAN Toolbox
+    try
+        cfg = wlanHESUConfig;
+        cfg.ChannelBandwidth = 'CBW20';     % 20 MHz
+        cfg.MCS = 0;                         % BPSK, rate 1/2
+
+        % Generate random data bits matching the required PSDU length
+        psduLen = getPSDULength(cfg);        % bytes
+        dataBits = randi([0 1], psduLen * 8, 1);
+
+        % Generate at native rate, then resample to fs
+        sig_bb_native = wlanWaveformGenerator(dataBits, cfg);
+        native_fs = 20e6;  % CBW20 native rate
+
+        % Resample to target fs
+        if abs(fs - native_fs) > 1
+            [P, Q] = rat(fs / native_fs, 1e-6);
+            sig_bb = resample(sig_bb_native(:,1), P, Q);
+        else
+            sig_bb = sig_bb_native(:,1);
+        end
+
+        % Repeat to fill output_len if needed
+        while length(sig_bb) < output_len
+            sig_bb = [sig_bb; sig_bb]; %#ok<AGROW>
+        end
+        sig_bb = sig_bb(1:output_len);
+
+        sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len);
+    catch ME
+        error('WiFi generation failed (need WLAN Toolbox): %s', ME.message);
+    end
+end
+
+
+function sig_pb = generate_lte_signal(output_len, fs, fc)
+    % GENERATE_LTE_SIGNAL - LTE downlink reference measurement channel
+    % Requires: LTE Toolbox
+    try
+        % R.0 = 1.4MHz BW, QPSK, 1 antenna
+        bits = randi([0 1], 2000, 1);
+        [sig_bb_native, ~, rmccfg] = lteRMCDLTool('R.0', bits);
+        native_fs = rmccfg.SamplingRate;
+
+        % Resample to target fs
+        if abs(fs - native_fs) > 1
+            [P, Q] = rat(fs / native_fs, 1e-6);
+            sig_bb = resample(sig_bb_native(:,1), P, Q);
+        else
+            sig_bb = sig_bb_native(:,1);
+        end
+
+        % Repeat to fill output_len
+        while length(sig_bb) < output_len
+            sig_bb = [sig_bb; sig_bb]; %#ok<AGROW>
+        end
+        sig_bb = sig_bb(1:output_len);
+
+        sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len);
+    catch ME
+        error('LTE generation failed (need LTE Toolbox): %s', ME.message);
+    end
+end
+
+
+function sig_pb = generate_5gnr_signal(output_len, fs, fc)
+    % GENERATE_5GNR_SIGNAL - 5G NR downlink waveform
+    % Requires: 5G Toolbox
+    try
+        cfg = nrDLCarrierConfig;
+        cfg.ChannelBandwidth = 10;          % 10 MHz (smallest FR1)
+        cfg.NumSubframes = 10;              % 10 ms frame
+
+        [sig_bb_native, info] = nrWaveformGenerator(cfg);
+        native_fs = info.ResourceGrids(1).Info.SampleRate;
+
+        % Resample to target fs
+        if abs(fs - native_fs) > 1
+            [P, Q] = rat(fs / native_fs, 1e-6);
+            sig_bb = resample(sig_bb_native(:,1), P, Q);
+        else
+            sig_bb = sig_bb_native(:,1);
+        end
+
+        % Repeat to fill output_len
+        while length(sig_bb) < output_len
+            sig_bb = [sig_bb; sig_bb]; %#ok<AGROW>
+        end
+        sig_bb = sig_bb(1:output_len);
+
+        sig_pb = upconvert_to_passband(sig_bb, fs, fc, output_len);
+    catch ME
+        error('5G NR generation failed (need 5G Toolbox): %s', ME.message);
+    end
 end
 
 
