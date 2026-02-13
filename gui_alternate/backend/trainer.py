@@ -25,7 +25,10 @@ class TrainerThread(QThread):
     # Match the notebook's signal length for ResNet1D
     TARGET_LENGTH = 2048
 
-    def __init__(self, file_label_pairs, labels, model_name='SimpleCNN', epochs=10, batch_size=32, lr=0.001, val_split=0.2):
+    def __init__(self, file_label_pairs, labels, model_name='SimpleCNN', epochs=10,
+                 batch_size=32, lr=0.001, val_split=0.2,
+                 weight_decay=1e-4, label_smoothing=0.1, grad_clip=1.0,
+                 model_hparams=None):
         super().__init__()
         self.file_label_pairs = list(file_label_pairs)
         self.labels = list(labels)
@@ -34,6 +37,10 @@ class TrainerThread(QThread):
         self.batch_size = int(batch_size)
         self.lr = float(lr)
         self.val_split = float(val_split)
+        self.weight_decay = float(weight_decay)
+        self.label_smoothing = float(label_smoothing)
+        self.grad_clip = float(grad_clip)
+        self.model_hparams = model_hparams or {}
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self._stop = False
         if self.device.type == 'cuda':
@@ -196,21 +203,20 @@ class TrainerThread(QThread):
         # Build model
         num_classes = len(self.labels)
         signal_len = X.shape[2]  # length after channel split
-        model = get_model(self.model_name, num_classes=num_classes, input_size=signal_len)
+        model = get_model(self.model_name, num_classes=num_classes, input_size=signal_len,
+                          **self.model_hparams)
         model.to(self.device)
 
         # Loss and optimizer
+        criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
+        optimizer = optim.AdamW(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-        # Optimized optimizer and loss
-        criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-        optimizer = optim.AdamW(model.parameters(), lr=self.lr, weight_decay=1e-4)
-        
         # Scheduler & Scaler
         warmup_epochs = min(3, max(1, int(self.epochs * 0.15)))
         scaler = GradScaler(enabled=torch.cuda.is_available())
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, 
-            T_max=max(1, self.epochs - warmup_epochs), 
+            optimizer,
+            T_max=max(1, self.epochs - warmup_epochs),
             eta_min=self.lr * 0.01
         )
 
@@ -253,7 +259,8 @@ class TrainerThread(QThread):
                     # Mixed Precision Backward
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    if self.grad_clip > 0:
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), self.grad_clip)
                     scaler.step(optimizer)
                     scaler.update()
                     

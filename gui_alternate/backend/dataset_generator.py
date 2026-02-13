@@ -13,7 +13,8 @@ class DatasetGeneratorThread(QThread):
     generation_finished = Signal(str)       # output directory path
     error_occurred = Signal(str)            # error message
 
-    def __init__(self, matlab_engine, modulations, samples_per_class, output_dir, waveform_params=None):
+    def __init__(self, matlab_engine, modulations, samples_per_class, output_dir,
+                 waveform_params=None, m_map_override=None):
         """
         Args:
             matlab_engine: Shared MATLAB engine wrapper (backend.matlab_engine.MatlabEngine)
@@ -22,6 +23,8 @@ class DatasetGeneratorThread(QThread):
             output_dir: base directory to write class folders into
             waveform_params: dict of default waveform parameters; individual fields may be
                              randomized per sample inside `_randomize_params`.
+            m_map_override: dict mapping modulation name to list of M values to randomly
+                            choose from per sample. Overrides the built-in _M_MAP entries.
         """
         super().__init__()
         self.matlab_engine = matlab_engine
@@ -29,6 +32,7 @@ class DatasetGeneratorThread(QThread):
         self.samples_per_class = int(samples_per_class)
         self.output_dir = output_dir
         self.waveform_params = waveform_params or {}
+        self.m_map_override = m_map_override or {}
         self._stop = False
 
     def stop(self):
@@ -91,8 +95,8 @@ class DatasetGeneratorThread(QThread):
 
         params.update(self.waveform_params)  # user overrides
 
-        # Pick a random M for the modulation type
-        m_choices = self._M_MAP.get(modulation, [4])
+        # Pick a random M for the modulation type (user-editable choices)
+        m_choices = self.m_map_override.get(modulation, self._M_MAP.get(modulation, [4]))
         params['M'] = int(rng.choice(m_choices))
 
         # Randomize noise variance

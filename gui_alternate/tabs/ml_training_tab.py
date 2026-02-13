@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QPushButton, QComboBox, QGridLayout, QFrame, QProgressBar, QFileDialog, QListWidget, QListWidgetItem)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                               QPushButton, QComboBox, QGridLayout, QFrame, QProgressBar, QFileDialog,
+                               QListWidget, QListWidgetItem, QGroupBox, QDoubleSpinBox, QScrollArea)
 from PySide6.QtCore import Qt, Signal
 
 import os
@@ -33,12 +34,10 @@ class MLTrainingTab(QWidget):
         layout.addWidget(right_panel, 2)
     
     def create_configuration_panel(self):
-        """Create the training configuration panel"""
-        panel = QFrame()
-        panel.setObjectName("card")
-        layout = QVBoxLayout(panel)
+        """Create the training configuration panel (scrollable)"""
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
         layout.setContentsMargins(24, 24, 24, 24)
-        #layout.setSpacing(20)
         
         # Title
         title = QLabel("⚙️ Training Configuration")
@@ -109,19 +108,105 @@ class MLTrainingTab(QWidget):
         # trainer reference
         self._trainer = None
 
-        
+        # --- Training Hyperparameters (collapsible) ---
+        self.training_hparams_group = QGroupBox("Training Hyperparameters")
+        self.training_hparams_group.setCheckable(True)
+        self.training_hparams_group.setChecked(False)
+        th_layout = QGridLayout(self.training_hparams_group)
+        th_layout.setSpacing(6)
+
         # Learning Rate
-        lr_header = QHBoxLayout()
-        lr_label = QLabel("Learning Rate")
-        self.lr_value = QLabel("0.0010")
-        self.lr_value.setProperty("class", "stat-value")
-        lr_header.addWidget(lr_label)
-        #lr_header.addStretch()
-        lr_header.addWidget(self.lr_value)
-        layout.addLayout(lr_header)
-        
-        # Training Parameters
-        #layout.addSpacing(10)
+        th_layout.addWidget(QLabel("Learning Rate"), 0, 0)
+        self.lr_spin = QDoubleSpinBox()
+        self.lr_spin.setRange(1e-6, 1.0)
+        self.lr_spin.setDecimals(6)
+        self.lr_spin.setSingleStep(0.0001)
+        self.lr_spin.setValue(0.001)
+        th_layout.addWidget(self.lr_spin, 0, 1)
+
+        # Weight Decay
+        th_layout.addWidget(QLabel("Weight Decay"), 1, 0)
+        self.weight_decay_spin = QDoubleSpinBox()
+        self.weight_decay_spin.setRange(0.0, 1.0)
+        self.weight_decay_spin.setDecimals(6)
+        self.weight_decay_spin.setSingleStep(0.0001)
+        self.weight_decay_spin.setValue(1e-4)
+        th_layout.addWidget(self.weight_decay_spin, 1, 1)
+
+        # Label Smoothing
+        th_layout.addWidget(QLabel("Label Smoothing"), 2, 0)
+        self.label_smoothing_spin = QDoubleSpinBox()
+        self.label_smoothing_spin.setRange(0.0, 1.0)
+        self.label_smoothing_spin.setDecimals(2)
+        self.label_smoothing_spin.setSingleStep(0.05)
+        self.label_smoothing_spin.setValue(0.1)
+        th_layout.addWidget(self.label_smoothing_spin, 2, 1)
+
+        # Validation Split
+        th_layout.addWidget(QLabel("Validation Split"), 3, 0)
+        self.val_split_spin = QDoubleSpinBox()
+        self.val_split_spin.setRange(0.05, 0.5)
+        self.val_split_spin.setDecimals(2)
+        self.val_split_spin.setSingleStep(0.05)
+        self.val_split_spin.setValue(0.2)
+        th_layout.addWidget(self.val_split_spin, 3, 1)
+
+        # Gradient Clip
+        th_layout.addWidget(QLabel("Gradient Clip"), 4, 0)
+        self.grad_clip_spin = QDoubleSpinBox()
+        self.grad_clip_spin.setRange(0.0, 100.0)
+        self.grad_clip_spin.setDecimals(2)
+        self.grad_clip_spin.setSingleStep(0.1)
+        self.grad_clip_spin.setValue(1.0)
+        th_layout.addWidget(self.grad_clip_spin, 4, 1)
+
+        # Hide contents initially (collapsed)
+        for i in range(th_layout.count()):
+            w = th_layout.itemAt(i).widget()
+            if w:
+                w.setVisible(False)
+        self.training_hparams_group.toggled.connect(
+            lambda checked: self._toggle_group(self.training_hparams_group, checked))
+        layout.addWidget(self.training_hparams_group)
+
+        # --- Per-Model Hyperparameters (collapsible) ---
+        self.model_hparams_group = QGroupBox("Model Hyperparameters")
+        self.model_hparams_group.setCheckable(True)
+        self.model_hparams_group.setChecked(False)
+        self._mh_layout = QGridLayout(self.model_hparams_group)
+        self._mh_layout.setSpacing(6)
+
+        # ResNet1DOptimized params
+        self._mh_base_filters_label = QLabel("Base Filters")
+        self._mh_layout.addWidget(self._mh_base_filters_label, 0, 0)
+        self.resnet_base_filters_spin = QDoubleSpinBox()
+        self.resnet_base_filters_spin.setRange(8, 512)
+        self.resnet_base_filters_spin.setDecimals(0)
+        self.resnet_base_filters_spin.setSingleStep(8)
+        self.resnet_base_filters_spin.setValue(64)
+        self._mh_layout.addWidget(self.resnet_base_filters_spin, 0, 1)
+
+        self._mh_dropout_label = QLabel("Dropout")
+        self._mh_layout.addWidget(self._mh_dropout_label, 1, 0)
+        self.resnet_dropout_spin = QDoubleSpinBox()
+        self.resnet_dropout_spin.setRange(0.0, 0.9)
+        self.resnet_dropout_spin.setDecimals(2)
+        self.resnet_dropout_spin.setSingleStep(0.05)
+        self.resnet_dropout_spin.setValue(0.2)
+        self._mh_layout.addWidget(self.resnet_dropout_spin, 1, 1)
+
+        self._mh_no_params_label = QLabel("No editable hyperparameters for this model.")
+        self._mh_layout.addWidget(self._mh_no_params_label, 0, 0, 1, 2)
+
+        # Hide all initially
+        for i in range(self._mh_layout.count()):
+            w = self._mh_layout.itemAt(i).widget()
+            if w:
+                w.setVisible(False)
+        self.model_hparams_group.toggled.connect(
+            lambda checked: self._on_model_hparams_toggled(checked))
+        self.model_combo.currentTextChanged.connect(self._update_model_hparams_visibility)
+        layout.addWidget(self.model_hparams_group)
 
         # Training Parameters
         params_layout = QGridLayout()
@@ -185,7 +270,39 @@ class MLTrainingTab(QWidget):
         self.status_label.setProperty("class", "stat-label")
         layout.addWidget(self.status_label)
         
-        return panel
+        # Wrap in scroll area so the panel doesn't compress
+        scroll = QScrollArea()
+        scroll.setObjectName("card")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(inner)
+        return scroll
+
+    def _toggle_group(self, group, checked):
+        """Show/hide all child widgets inside a QGroupBox."""
+        group_layout = group.layout()
+        for i in range(group_layout.count()):
+            w = group_layout.itemAt(i).widget()
+            if w:
+                w.setVisible(checked)
+        # For the model hparams group, also apply model-specific visibility
+        if group is self.model_hparams_group and checked:
+            self._update_model_hparams_visibility(self.model_combo.currentText())
+
+    def _on_model_hparams_toggled(self, checked):
+        """Handle model hyperparameters group toggle."""
+        self._toggle_group(self.model_hparams_group, checked)
+
+    def _update_model_hparams_visibility(self, model_name):
+        """Show/hide model-specific hyperparameter widgets based on selected model."""
+        if not self.model_hparams_group.isChecked():
+            return
+        is_resnet = model_name == 'ResNet1DOptimized'
+        self._mh_base_filters_label.setVisible(is_resnet)
+        self.resnet_base_filters_spin.setVisible(is_resnet)
+        self._mh_dropout_label.setVisible(is_resnet)
+        self.resnet_dropout_spin.setVisible(is_resnet)
+        self._mh_no_params_label.setVisible(not is_resnet)
 
     def add_data_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Data Folder", os.path.expanduser("~"))
@@ -453,10 +570,17 @@ class MLTrainingTab(QWidget):
             self.status_label.setText("No supported files found in datasets")
             return
         
+        # Read training hyperparameters from UI
+        lr = self.lr_spin.value()
+        val_split = self.val_split_spin.value()
+        weight_decay = self.weight_decay_spin.value()
+        label_smoothing = self.label_smoothing_spin.value()
+        grad_clip = self.grad_clip_spin.value()
+
         total_files = len(file_label_pairs)
-        train_count = int(total_files * 0.8) # Assuming 80/20 split in your trainer
+        train_count = int(total_files * (1.0 - val_split))
         val_count = total_files - train_count
-        
+
         # Update the UI labels with ACTUAL data numbers
         self.val_labels["Training Samples"].setText(f"{train_count:,}")
         self.val_labels["Validation Samples"].setText(f"{val_count:,}")
@@ -466,6 +590,12 @@ class MLTrainingTab(QWidget):
         epochs = int(self.epochs_spin.value())
         batch_size = int(self.batch_spin.value())
 
+        # Collect per-model hyperparameters
+        model_hparams = {}
+        if model_name == 'ResNet1DOptimized':
+            model_hparams['base_filters'] = int(self.resnet_base_filters_spin.value())
+            model_hparams['dropout'] = self.resnet_dropout_spin.value()
+
         # Update progress bar max and clear charts
         self.progress_bar.setMaximum(epochs)
         self.progress_bar.setValue(0)
@@ -473,7 +603,13 @@ class MLTrainingTab(QWidget):
         self.loss_chart.clear_data()
         self.acc_chart.clear_data()
 
-        self._trainer = TrainerThread(file_label_pairs, labels, model_name=model_name, epochs=epochs, batch_size=batch_size)
+        self._trainer = TrainerThread(
+            file_label_pairs, labels,
+            model_name=model_name, epochs=epochs, batch_size=batch_size,
+            lr=lr, val_split=val_split,
+            weight_decay=weight_decay, label_smoothing=label_smoothing,
+            grad_clip=grad_clip, model_hparams=model_hparams,
+        )
         self._trainer.progress.connect(self.update_training_progress)
         self._trainer.finished.connect(self.on_training_finished)
 
@@ -483,7 +619,7 @@ class MLTrainingTab(QWidget):
         self.status_label.setText("Training...")
         self.train_btn.setEnabled(False)
         self._trainer.start()
-        print(f"Trainer started: model={model_name}, epochs={epochs}, batch_size={batch_size}")
+        print(f"Trainer started: model={model_name}, epochs={epochs}, batch_size={batch_size}, lr={lr}")
         
     def update_training_progress(self, epoch, total_epochs, train_loss, val_loss, train_acc, val_acc):
         """Update the training progress and labels with dynamic values"""

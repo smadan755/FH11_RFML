@@ -159,8 +159,12 @@ class ResNet1DOptimized(nn.Module):
 
 
 
-def get_model(name, num_classes=2, input_size=256):
-    """Return a PyTorch model by name."""
+def get_model(name, num_classes=2, input_size=256, **kwargs):
+    """Return a PyTorch model by name.
+
+    Extra ``kwargs`` are forwarded to model constructors that accept them
+    (e.g. ``base_filters`` and ``dropout`` for ResNet1DOptimized).
+    """
     if name == 'SimpleCNN':
         return SimpleCNN(num_classes=num_classes)
     elif name == 'TinyConv':
@@ -168,8 +172,10 @@ def get_model(name, num_classes=2, input_size=256):
     elif name == 'MLP':
         return MLP(input_size=input_size, num_classes=num_classes)
     elif name == 'ResNet1DOptimized':
-        # in_ch=2 for IQ signals 
-        return ResNet1DOptimized(in_ch=2, n_classes=num_classes)
+        base_filters = int(kwargs.get('base_filters', 64))
+        dropout = float(kwargs.get('dropout', 0.2))
+        return ResNet1DOptimized(in_ch=2, base_filters=base_filters,
+                                 n_classes=num_classes, dropout=dropout)
     else:
         return SimpleCNN(num_classes=num_classes)
 

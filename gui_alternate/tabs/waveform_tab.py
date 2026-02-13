@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QComboBox, QSpinBox, QFrame,
                                QSlider, QGridLayout, QTabWidget, QDoubleSpinBox,
-                               QLineEdit, QMessageBox, QProgressBar, QScrollArea)
+                               QLineEdit, QMessageBox, QProgressBar, QScrollArea,
+                               QGroupBox)
 from PySide6.QtCore import Qt
 
 from widgets.waveform_plots import PlottingWidget, FreqDomainPlot, IQDomainPlot, SpectrogramPlot
@@ -181,6 +182,41 @@ class WaveformSelectionTab(QWidget):
         self.batch_count_spin.setValue(50)
         batch_ctrl.addWidget(self.batch_count_spin)
         layout.addLayout(batch_ctrl)
+
+        # --- Per-class M choices (collapsible) ---
+        from backend.dataset_generator import DatasetGeneratorThread
+        self._default_m_map = dict(DatasetGeneratorThread._M_MAP)
+
+        self.batch_params_group = QGroupBox("Per-Class M Choices")
+        self.batch_params_group.setCheckable(True)
+        self.batch_params_group.setChecked(False)  # collapsed by default
+        bp_layout = QGridLayout(self.batch_params_group)
+        bp_layout.setSpacing(4)
+
+        bp_layout.addWidget(QLabel("Modulation"), 0, 0)
+        bp_layout.addWidget(QLabel("M values (comma-separated)"), 0, 1)
+
+        self._m_map_edits = {}  # modulation -> QLineEdit
+        modulations = [self.waveform_combo.itemText(i) for i in range(self.waveform_combo.count())]
+        for row, mod in enumerate(modulations, start=1):
+            lbl = QLabel(mod)
+            edit = QLineEdit()
+            defaults = self._default_m_map.get(mod, [4])
+            edit.setText(", ".join(str(v) for v in defaults))
+            edit.setToolTip(f"M values randomly chosen per sample for {mod}")
+            bp_layout.addWidget(lbl, row, 0)
+            bp_layout.addWidget(edit, row, 1)
+            self._m_map_edits[mod] = edit
+            # hide contents initially
+            lbl.setVisible(False)
+            edit.setVisible(False)
+
+        # Also hide header labels
+        bp_layout.itemAtPosition(0, 0).widget().setVisible(False)
+        bp_layout.itemAtPosition(0, 1).widget().setVisible(False)
+
+        self.batch_params_group.toggled.connect(self._toggle_batch_params)
+        layout.addWidget(self.batch_params_group)
 
         # Batch progress
         self.batch_progress = QProgressBar()
@@ -392,6 +428,14 @@ class WaveformSelectionTab(QWidget):
         np.save(save_path, self._last_signal)
         self.batch_status.setText(f"Saved: {save_path}")
 
+    def _toggle_batch_params(self, checked):
+        """Show/hide the per-class M choice widgets."""
+        group_layout = self.batch_params_group.layout()
+        for i in range(group_layout.count()):
+            item = group_layout.itemAt(i)
+            if item and item.widget():
+                item.widget().setVisible(checked)
+
     def batch_generate(self):
         """Launch batch dataset generation across modulation classes."""
         from backend.dataset_generator import DatasetGeneratorThread
@@ -413,12 +457,23 @@ class WaveformSelectionTab(QWidget):
             'pulse_shape': self.pulse_shape_combo.currentText(),
         }
 
+        # Parse user-edited M map from the UI
+        m_map_override = {}
+        for mod, edit in self._m_map_edits.items():
+            try:
+                vals = [int(v.strip()) for v in edit.text().split(",") if v.strip()]
+                if vals:
+                    m_map_override[mod] = vals
+            except ValueError:
+                pass  # fall back to defaults for this mod
+
         self._gen_thread = DatasetGeneratorThread(
             matlab_engine=self.eng,
             modulations=modulations,
             samples_per_class=samples,
             output_dir=out_dir,
             waveform_params=params,
+            m_map_override=m_map_override,
         )
         self._gen_thread.sample_progress.connect(self._on_batch_progress)
         self._gen_thread.generation_finished.connect(self._on_batch_finished)
