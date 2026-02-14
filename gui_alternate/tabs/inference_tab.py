@@ -59,7 +59,7 @@ class InferenceResultsTab(QWidget):
         layout.setSpacing(15)
         
         # Header
-        title = QLabel("📊 Model Evaluation")
+        title = QLabel("Model Evaluation")
         title.setProperty("class", "section-title")
         subtitle = QLabel("Load a trained model and evaluate on test data")
         subtitle.setProperty("class", "section-subtitle")
@@ -88,7 +88,7 @@ class InferenceResultsTab(QWidget):
         self.load_data_btn.setEnabled(False)
         data_layout.addWidget(self.load_data_btn)
         
-        self.quick_load_test_btn = QPushButton("📦 Quick Load Test Data")
+        self.quick_load_test_btn = QPushButton("Quick Load Test Data")
         self.quick_load_test_btn.setToolTip("Load class folders from waveform_data/ for evaluation")
         self.quick_load_test_btn.clicked.connect(self.quick_load_test_data)
         self.quick_load_test_btn.setEnabled(False)

@@ -86,7 +86,7 @@ class EvaluateModelTab(QWidget):
         layout.setSpacing(10)
 
         # --- Model section ---
-        title = QLabel("🧪 Evaluate Model")
+        title = QLabel("Evaluate Model")
         title.setProperty("class", "section-title")
         layout.addWidget(title)
         subtitle = QLabel("Generate a waveform and classify it")

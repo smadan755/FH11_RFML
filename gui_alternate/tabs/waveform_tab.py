@@ -160,14 +160,14 @@ class WaveformSelectionTab(QWidget):
 
         # Save / Batch generate
         save_layout = QHBoxLayout()
-        self.save_btn = QPushButton("💾 Save to Dataset")
+        self.save_btn = QPushButton("Save to Dataset")
         self.save_btn.setToolTip("Save last generated waveform to waveform_data/<modulation>/")
         self.save_btn.clicked.connect(self.save_to_dataset)
         self.save_btn.setEnabled(False)
         self.save_btn.setMinimumHeight(32)
         save_layout.addWidget(self.save_btn)
 
-        self.batch_btn = QPushButton("📦 Batch Generate")
+        self.batch_btn = QPushButton("Batch Generate")
         self.batch_btn.setToolTip("Generate N samples per modulation class")
         self.batch_btn.clicked.connect(self.batch_generate)
         self.batch_btn.setMinimumHeight(32)

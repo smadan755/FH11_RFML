@@ -159,7 +159,7 @@ class ChannelNoiseTab(QWidget):
         # Header
         header = QHBoxLayout()
         title_layout = QVBoxLayout()
-        title = QLabel("🔊 Noise Configuration")
+        title = QLabel("Noise Configuration")
         title.setProperty("class", "card-title")
         subtitle = QLabel("Configure noise and interference parameters")
         subtitle.setProperty("class", "section-subtitle")

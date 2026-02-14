@@ -2,161 +2,163 @@
 
 Project Repo for Faculty Honors team FH11: Spectrum Sensing and Signal Classification using Deep Neural Networks
 
-## Contents
-
-- `bpsk.m`, `pam.m`, `mqam.m`, `fhss_bpsk.m`, `mfsk.m` - MATLAB functions that generate modulated signals and save them to `.npy` files
-- `gui/main_window.py` - Interactive Qt GUI application for waveform generation and visualization
-- `gui/waveform_functions/` - Modified MATLAB functions that return waveforms for real-time plotting
-- `examples/interactive_test.ipynb` - interactive notebook that calls `bpsk()` via the MATLAB Engine
-- `test_wav.ipynb` - example notebook demonstrating basic MATLAB Engine usage
-- `data_bpsk/`, `data_pam/` - generated example data (NumPy .npy files)
-
 ## Overview
 
-This repository demonstrates how to:
+An end-to-end RF signal analysis and machine learning platform that combines MATLAB DSP waveform generation with PyTorch deep learning for automatic modulation classification. A tabbed PySide6 GUI walks through the full pipeline: generate waveforms, apply channel effects, train a classifier, run inference, and evaluate results.
 
-- Start and control a MATLAB session from Python using the MATLAB Engine for Python
-- Transfer data between NumPy and MATLAB
-- Use MATLAB toolboxes (e.g., signal processing) from Python
-- Save MATLAB arrays to NumPy `.npy` files from MATLAB using the `npy-matlab` helper
-- **NEW:** Generate and visualize RF waveforms in real-time using a Qt-based GUI
+### Supported Modulation Types
 
-## GUI Application
+PAM, QAM, PSK, FSK, FHSS, OFDM, LFM, Barker, FMCW, WiFi, LTE, 5G\_NR
 
-The repository includes an interactive GUI application (`gui/main_window.py`) for generating and visualizing RF modulation waveforms. See the gui/ folder for more details
+## Quick Start
 
-#### Configure Python enviroment variables
-
-Copy and paste the .env.example into a new .env file, and then replace the ROOT variable with the (FH11) repository's root directory on your computer.
-
-## Install MATLAB Engine for Python
-
-The MATLAB Engine Python package must match your MATLAB release series. For R2025b (MATLAB version 25.2.x) install the matching engine. Example (PowerShell):
+### 1. Install dependencies
 
 ```powershell
-# Example: install engine matching MATLAB R2025b (25.2.x)
-& "C:\Python311\python.exe" -m pip install --user "matlabengine==25.2.2"
+pip install -r requirements.txt
+pip install -r gui_alternate/requirements.txt
 ```
 
-If you previously tried to install a different engine (e.g., 26.1.1) you may see an error similar to:
+### 2. Install MATLAB Engine for Python
 
-> No compatible MATLAB installation found in Windows Registry. This release of MATLAB Engine API for Python is compatible with version X.Y. The found versions were A.B.
+The engine version must match your MATLAB release. For example, with MATLAB R2025b:
 
-In that case pick the engine version that matches your MATLAB release, or install the MATLAB release that matches the engine.
+```powershell
+pip install --user "matlabengine==25.2.2"
+```
 
-## Install npy-matlab (writeNPY/readNPY)
-
-The MATLAB functions in this repo call `writeNPY()` to save `.npy` files from MATLAB. MATLAB doesn't include `writeNPY` by default — use the `npy-matlab` project.
-
-Clone it into the repo:
+### 3. Install npy-matlab (writeNPY/readNPY)
 
 ```powershell
 cd C:\Users\madan\FH11_RFML
 git clone https://github.com/kwikteam/npy-matlab.git
 ```
 
-Then add it to MATLAB's path in your Python notebook (example already in `examples/interactive_test.ipynb`):
+### 4. Run the GUI
 
-```python
-# from your Python session
-eng.addpath(r'c:\Users\madan\FH11_RFML\npy-matlab', nargout=0)
+```powershell
+cd gui_alternate
+python main_window.py
 ```
 
-Alternatively, add the cloned folder to your MATLAB path permanently using `pathtool` or `addpath` in your MATLAB startup script.
+## GUI Tabs
 
-## Running the examples
+The application is organized into five tabs that form a complete signal-to-classification pipeline:
 
-1. Start MATLAB Engine from Python (in a notebook or script):
+### 1. Waveform Selection
 
-```python
-import matlab.engine
-eng = matlab.engine.start_matlab()
-print('MATLAB engine started!')
+Configure and generate RF waveforms via MATLAB. Parameters include sampling frequency, carrier frequency, symbol period, modulation order (M), pulse shaping (RRC/rectangular), and more. Four real-time plots show time-domain, frequency-domain, IQ constellation, and spectrogram views.
+
+- **Save to Dataset** -- save individual waveforms as `.npy` files
+- **Batch Generate** -- generate N samples per modulation class for ML training. Per-class M choices are exposed in a collapsible panel so you can control which modulation orders are randomly sampled.
+
+### 2. Channel & Noise
+
+Apply channel effects and noise to generated waveforms. Includes multi-path fading, AWGN, colored noise, and SNR controls with interactive spectrum visualization.
+
+### 3. ML Training
+
+Train PyTorch classifiers on your generated dataset.
+
+**Exposed controls:**
+- Model architecture: SimpleCNN, TinyConv, MLP, ResNet1DOptimized
+- Epochs, batch size
+
+**Training Hyperparameters** (collapsible):
+- Learning rate (default 0.001)
+- Weight decay (default 1e-4)
+- Label smoothing (default 0.1)
+- Validation split (default 0.2)
+- Gradient clip (default 1.0)
+
+**Model Hyperparameters** (collapsible, varies by model):
+- ResNet1DOptimized: base filters (default 64), dropout (default 0.2)
+
+Training uses AdamW with cosine annealing LR scheduling, warmup, mixed-precision (AMP), and gradient clipping. Loss and accuracy curves update in real time.
+
+### 4. Inference Results
+
+Load a trained model and run inference on test waveforms. Displays confusion matrix, classification report, and ROC curves with AUC.
+
+### 5. Evaluate Model
+
+Generate new waveforms and classify them with a loaded model for quick spot-checking.
+
+Trained models are automatically forwarded from the ML Training tab to both the Inference and Evaluate tabs.
+
+## Model Architectures
+
+| Model | Input | Description |
+|---|---|---|
+| SimpleCNN | 1-ch signal | Two Conv1d layers + adaptive pooling + FC |
+| TinyConv | 1-ch signal | Single Conv1d layer + adaptive pooling + FC |
+| MLP | Flattened vector | Three fully-connected layers |
+| ResNet1DOptimized | 2-ch IQ | Multi-scale input, 10 residual blocks with squeeze-excitation, GroupNorm, progressive filter scaling (64-256) |
+
+Models are saved as `.pth` + `.json` metadata to `gui_alternate/models/`.
+
+## Project Structure
+
+```
+FH11_RFML/
+  gui_alternate/            # Main GUI application
+    main_window.py          # Entry point
+    gui_elements.py         # Waveform class (MATLAB bridge)
+    tabs/                   # UI tabs
+      waveform_tab.py       # Waveform generation & batch dataset creation
+      channel_tab.py        # Channel & noise effects
+      ml_training_tab.py    # Model training interface
+      inference_tab.py      # Inference & evaluation visualizations
+      evaluate_model_tab.py # Live model evaluation
+    backend/                # Core services
+      trainer.py            # TrainerThread (PyTorch training loop)
+      torch_models.py       # Model definitions
+      tf_models.py          # TensorFlow models (legacy)
+      dataset_generator.py  # Batch waveform generation thread
+      core.py               # WaveformConfig dataclass
+      generators.py         # MATLAB waveform generator wrapper
+      waveform_pipeline.py  # End-to-end generation pipeline
+    widgets/                # Custom Qt widgets
+      waveform_plots.py     # Time, freq, IQ, spectrogram plots
+      training_chart.py     # Live loss/accuracy chart
+      power_spectrum.py     # Power spectrum display
+      noise_spectrum.py     # Noise spectrum display
+      constellation.py      # IQ constellation plot
+      toggle_switch.py      # Custom toggle switch
+    styles/
+      stylesheet.py         # Dark theme
+    waveform_functions/     # MATLAB .m files that return data to Python
+  gui/                      # Legacy GUI (deprecated, kept for reference)
+  sionna/                   # Sionna channel simulation experiments
+  tools/SRD/                # Software Receiver Design reference code
+  *.m                       # Root MATLAB generators (save to disk)
+  data_bpsk/, data_pam/     # Example generated data
 ```
 
-2. Make sure the repository and `npy-matlab` are on MATLAB's path:
+## Dependencies
 
-```python
-eng.addpath(r'c:\Users\madan\FH11_RFML', nargout=0)
-eng.addpath(r'c:\Users\madan\FH11_RFML\npy-matlab', nargout=0)
-```
+**Core:**
+- PySide6, NumPy, SciPy, Matplotlib, python-dotenv
+- MATLAB Engine for Python (must match your MATLAB release)
+- npy-matlab (for MATLAB `.npy` I/O)
 
-3. Call the `bpsk()` generator (note this function does not return values — it writes files to disk):
+**ML:**
+- PyTorch, scikit-learn
 
-```python
-# bpsk() writes .npy files to disk; it does not return outputs
-eng.bpsk(data_samp_count, save_path, output_len, fs, Tsymb, fc, nargout=0)
-```
+## Environment Setup
 
-4. Example notebooks to open and run:
+Copy `.env.example` to `.env` and set the `ROOT` variable to your local repo path.
 
-- `examples/interactive_test.ipynb` — runs `bpsk()` and demonstrates PSD extraction
-- `test_wav.ipynb` — notebooks with MATLAB Engine demo code
+## Troubleshooting
 
-## Important Gotchas / Troubleshooting
-
-- "Too many output arguments":
-
-  - Cause: You called a MATLAB function from Python expecting a return value but the MATLAB function is defined with no outputs.
-  - Fix: Call the function with `nargout=0` from Python (e.g., `eng.bpsk(..., nargout=0)`).
-  - **Note:** There are two versions of some functions (e.g., `pam.m`): root versions save to disk (no outputs), while `gui/waveform_functions/` versions return data for plotting. Make sure the correct path is added to MATLAB when using the GUI.
-
-- "Undefined function 'writeNPY'":
-
-  - Cause: `writeNPY()` is provided by the `npy-matlab` project, not by MATLAB core.
-  - Fix: Clone `npy-matlab` and add it to the MATLAB path as described above.
-
-- MATLAB Engine version mismatch:
-  - The pip package name must match your MATLAB release. If pip install fails with a message about registry-found versions, install the engine that corresponds to your MATLAB release (or install a matching MATLAB release).
-
-## Recommended workflow
-
-- Use Python for orchestration, ML code, and visualization (NumPy, matplotlib, PyTorch/TensorFlow).
-- Use MATLAB for DSP-heavy routines or toolbox-specific functions.
-- Move arrays with `matlab.double()` (from Python NumPy -> MATLAB) and read results back with `np.array(eng.workspace['var'])`.
-
-## Quick tests to verify setup
-
-In a Python REPL or notebook cell:
-
-```python
-import matlab.engine
-import numpy as np
-eng = matlab.engine.start_matlab()
-eng.addpath(r'c:\Users\madan\FH11_RFML\npy-matlab', nargout=0)
-
-# test saving and loading using MATLAB helper
-arr = np.arange(10).astype(float)
-mat_arr = matlab.double(arr.tolist())
-eng.workspace['arr'] = mat_arr
-eng.eval("writeNPY(arr, fullfile(pwd, 'test_arr.npy'));", nargout=0)
-# Back in Python, verify the file exists or read it with numpy
-import os
-print(os.path.exists(r'c:\Users\madan\FH11_RFML\test_arr.npy'))
-```
-
-If the file is created successfully, `npy-matlab` is working.
-
-## Where to go next
-
-- **Try the GUI:** Run `python gui/main_window.py` to experiment with real-time waveform generation and visualization
-- Clone `npy-matlab` (if not done) and re-run the example notebooks
-- Customize waveform parameters in the GUI or notebooks to see different modulation schemes
-- If you want `bpsk()` to also return the generated vector to Python (instead of only saving), update `bpsk.m` to include an output argument and return `bpsk_pb`
-
-## License
-
-This README and repository are provided as-is for demo/learning purposes. Check toolbox/license constraints for MATLAB code if you plan to reuse in other projects.
+- **"Too many output arguments"** -- call MATLAB functions with `nargout=0` when they don't return values. The `gui/waveform_functions/` versions return data; root `.m` files save to disk.
+- **"Undefined function 'writeNPY'"** -- clone `npy-matlab` and add it to the MATLAB path.
+- **MATLAB Engine version mismatch** -- the pip package version must match your MATLAB release series.
 
 ## Attribution
 
-**Software Receiver Design (SRD) Code**
+The `tools/SRD/` directory contains MATLAB code from *Software Receiver Design* by C. Richard Johnson, Jr. and William A. Sethares ([github.com/gopmc/SRD](https://github.com/gopmc/SRD)), used for educational purposes.
 
-The `tools/SRD/` directory contains MATLAB code examples from the book "Software Receiver Design" by C. Richard Johnson, Jr. and William A. Sethares. These files are used for educational purposes as reference implementations for signal processing and receiver design concepts.
+## License
 
-- Book: "Software Receiver Design: Build Your Own Digital Communication System in Five Easy Steps"
-- Authors: C. Richard Johnson, Jr. and William A. Sethares
-- Original code repository: [(https://github.com/gopmc/SRD)]
-- Used under educational/research purposes
-
-If you use this code in your own projects, please cite the original authors and their work appropriately.
+Provided as-is for educational and research purposes. Check MATLAB toolbox license constraints before reuse.
