@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QSlider, QGridLayout, QTabWidget, QDoubleSpinBox,
                                QLineEdit, QMessageBox, QProgressBar, QScrollArea,
                                QGroupBox)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 from widgets.waveform_plots import PlottingWidget, FreqDomainPlot, IQDomainPlot, SpectrogramPlot
 from gui_elements import Waveform
@@ -13,6 +13,10 @@ import os
 
 class WaveformSelectionTab(QWidget):
     """Waveform configuration and visualization tab"""
+
+    # Emitted after a waveform is generated: (signal_np, fs, modulation)
+    waveform_generated = Signal(object, float, str)
+
     def __init__(self, eng, parent=None):
         super().__init__(parent)
         self.eng = eng  # Raw MATLAB engine (matlab.engine)
@@ -399,6 +403,9 @@ class WaveformSelectionTab(QWidget):
                 nsymb=nsymb,
                 eng=self.eng
             )
+
+            # Notify other tabs (e.g. Channel tab) about the new waveform
+            self.waveform_generated.emit(data, fs, modulation)
 
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Parameters", str(e))

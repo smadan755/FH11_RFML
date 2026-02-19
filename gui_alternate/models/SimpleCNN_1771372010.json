@@ -1,0 +1,19 @@
+{
+  "model_name": "SimpleCNN",
+  "class_labels": [
+    "Barker",
+    "FHSS",
+    "FMCW",
+    "FSK",
+    "LFM",
+    "LTE",
+    "PAM",
+    "PSK",
+    "QAM",
+    "WiFi"
+  ],
+  "num_classes": 10,
+  "input_channels": 1,
+  "signal_length": 2048,
+  "timestamp": 1771372010
+}

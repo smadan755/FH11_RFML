@@ -1,0 +1,19 @@
+{
+  "model_name": "ResNet1DOptimized",
+  "class_labels": [
+    "Barker",
+    "FHSS",
+    "FMCW",
+    "FSK",
+    "LFM",
+    "LTE",
+    "PAM",
+    "PSK",
+    "QAM",
+    "WiFi"
+  ],
+  "num_classes": 10,
+  "input_channels": 2,
+  "signal_length": 1024,
+  "timestamp": 1771372054
+}

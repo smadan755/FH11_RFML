@@ -389,6 +389,19 @@ def get_stylesheet(dark_mode=False):
             NavigationToolbar2QT QToolButton:hover {
                 background-color: #404060;
             }
+            QPushButton#themeToggle {
+                background-color: transparent;
+                border: 1px solid #404060;
+                border-radius: 14px;
+                padding: 5px 14px;
+                font-size: 12px;
+                color: #9ca3af;
+            }
+            QPushButton#themeToggle:hover {
+                border-color: #6366f1;
+                color: #e0e0e0;
+                background-color: #2d2d44;
+            }
         """
     else:
         return """
@@ -690,5 +703,18 @@ def get_stylesheet(dark_mode=False):
             QTabWidget::pane {
                 border: 1px solid #e5e7eb;
                 top: -1px;
+            }
+            QPushButton#themeToggle {
+                background-color: transparent;
+                border: 1px solid #d1d5db;
+                border-radius: 14px;
+                padding: 5px 14px;
+                font-size: 12px;
+                color: #6b7280;
+            }
+            QPushButton#themeToggle:hover {
+                border-color: #111827;
+                color: #111827;
+                background-color: #f3f4f6;
             }
         """

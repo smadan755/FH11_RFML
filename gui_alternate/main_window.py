@@ -67,13 +67,16 @@ class SignalDashboard(QMainWindow):
         # Wire training → inference & evaluate: auto-load trained model
         self.ml_training_tab.trained_model_ready.connect(self.inference_tab.receive_trained_model)
         self.ml_training_tab.trained_model_ready.connect(self.evaluate_tab.receive_trained_model)
+
+        # Wire waveform → channel: send generated waveform for CIR application
+        self.waveform_tab.waveform_generated.connect(self.channel_tab.receive_waveform)
         
         main_layout.addWidget(self.content_stack, 1)
     
     def create_header(self, layout):
         """Create the header section with title and subtitle"""
         header_layout = QHBoxLayout()
-        
+
         title_layout = QVBoxLayout()
         title = QLabel("📈 Signal Generation & Classification")
         title.setProperty("class", "title")
@@ -82,10 +85,18 @@ class SignalDashboard(QMainWindow):
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
         title_layout.setSpacing(4)
-        
+
         header_layout.addLayout(title_layout)
         header_layout.addStretch()
-        
+
+        # Dark / Light mode toggle
+        self.theme_btn = QPushButton("☀️ Light Mode")
+        self.theme_btn.setObjectName("themeToggle")
+        self.theme_btn.setCursor(Qt.PointingHandCursor)
+        self.theme_btn.clicked.connect(self.toggle_theme)
+        self._update_theme_button()
+        header_layout.addWidget(self.theme_btn)
+
         layout.addLayout(header_layout)
     
     def create_tab_navigation(self, layout):
@@ -114,6 +125,18 @@ class SignalDashboard(QMainWindow):
         for i, btn in enumerate(self.tab_buttons):
             btn.setChecked(i == index)
         self.content_stack.setCurrentIndex(index)
+
+    def toggle_theme(self):
+        """Toggle between dark and light mode."""
+        self.dark_mode = not self.dark_mode
+        self.setStyleSheet(get_stylesheet(self.dark_mode))
+        self._update_theme_button()
+
+    def _update_theme_button(self):
+        if self.dark_mode:
+            self.theme_btn.setText("☀️  Light Mode")
+        else:
+            self.theme_btn.setText("🌙  Dark Mode")
 
 
 if __name__ == "__main__":
