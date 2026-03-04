@@ -9,6 +9,7 @@ from tabs.channel_tab import ChannelNoiseTab
 from tabs.ml_training_tab import MLTrainingTab
 from tabs.inference_tab import InferenceResultsTab
 from tabs.evaluate_model_tab import EvaluateModelTab
+from tabs.data_visualization_tab import DataVisualizationTab # for ML visualization (t-sne,umap..etc)
 from styles.stylesheet import get_stylesheet
 
 import matlab.engine
@@ -54,6 +55,9 @@ class SignalDashboard(QMainWindow):
         
         self.channel_tab = ChannelNoiseTab()
         self.content_stack.addWidget(self.channel_tab)
+
+        self.data_vis_tab = DataVisualizationTab()              #Adding ML visualization tab
+        self.content_stack.addWidget(self.data_vis_tab)   
         
         self.ml_training_tab = MLTrainingTab()
         self.content_stack.addWidget(self.ml_training_tab)
@@ -105,7 +109,7 @@ class SignalDashboard(QMainWindow):
         tab_layout.setSpacing(0)
         
         self.tab_buttons = []
-        tabs = ["Waveform Selection", "Channel & Noise", "ML Training", "Inference Results", "Evaluate Model"]
+        tabs = ["Waveform Selection", "Channel & Noise","Data Visualization", "ML Training", "Inference Results", "Evaluate Model"]
         
         for i, tab_name in enumerate(tabs):
             tab_btn = QPushButton(tab_name)
