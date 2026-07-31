@@ -8,6 +8,9 @@ def get_stylesheet(dark_mode=False):
             QMainWindow {
                 background-color: #1a1a2e;
             }
+            QWidget#mainContent {
+                background-color: #1a1a2e;
+            }
             QWidget {
                 background-color: transparent;
                 color: #e0e0e0;
@@ -242,6 +245,29 @@ def get_stylesheet(dark_mode=False):
                 background-color: #2d2d44;
                 border-radius: 12px;
                 border: 1px solid #404060;
+            }
+            QScrollArea#card {
+                background-color: #2d2d44;
+                border-radius: 12px;
+                border: 1px solid #404060;
+            }
+            QScrollArea#card::viewport {
+                background-color: #2d2d44;
+                border: none;
+            }
+            QGroupBox {
+                background-color: #2d2d44;
+                border: 1px solid #404060;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding: 8px;
+                color: #e0e0e0;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px;
+                color: #c0c0d0;
             }
             QFrame#infoBox {
                 background-color: #1e1e3a;

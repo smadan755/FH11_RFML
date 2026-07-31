@@ -7,6 +7,7 @@ propagation paths (via sionna-vispy), and apply the channel to waveforms
 received from the Waveform Selection tab.
 """
 
+import os
 import traceback
 
 import numpy as np
@@ -521,6 +522,21 @@ class ChannelNoiseTab(QWidget):
     # Apply CIR to waveform
     # ==================================================================
 
+    def _save_channelized_waveform(self, signal: np.ndarray) -> str:
+        """Save a channel-impaired waveform in the standard class-folder layout."""
+        tabs_dir = os.path.dirname(os.path.abspath(__file__))
+        output_dir = os.path.join(
+            os.path.dirname(tabs_dir), "waveform_data", self._waveform_modulation
+        )
+        os.makedirs(output_dir, exist_ok=True)
+
+        index = 0
+        while os.path.exists(os.path.join(output_dir, f"channel_data_{index}.npy")):
+            index += 1
+        path = os.path.join(output_dir, f"channel_data_{index}.npy")
+        np.save(path, signal)
+        return path
+
     def apply_cir_to_waveform(self):
         if self._last_result is None or self._waveform_signal is None:
             return
@@ -533,5 +549,9 @@ class ChannelNoiseTab(QWidget):
 
         self.comparison_plot.plot_comparison(
             t, self._waveform_signal, convolved, self._waveform_modulation
+        )
+        save_path = self._save_channelized_waveform(convolved)
+        self.apply_info.setText(
+            f"Applied CIR and saved training sample: {os.path.basename(save_path)}"
         )
         self.plot_tabs.setCurrentIndex(2)  # switch to Before/After tab

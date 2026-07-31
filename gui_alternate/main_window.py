@@ -26,6 +26,7 @@ class SignalDashboard(QMainWindow):
 
         # Main widget
         main_widget = QWidget()
+        main_widget.setObjectName("mainContent")
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
         main_layout.setContentsMargins(20, 20, 20, 20)
